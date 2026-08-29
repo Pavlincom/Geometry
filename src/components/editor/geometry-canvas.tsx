@@ -90,25 +90,56 @@ function Scene({ cameraRequest }: { cameraRequest: CameraRequest }) {
   const selectedIds = useEditorStore((state) => state.selectedIds);
   const snapToGrid = useEditorStore((state) => state.snapToGrid);
   const addPoint = useEditorStore((state) => state.addPoint);
-  const togglePoint = useEditorStore((state) => state.togglePoint);
-  const movePoint = useEditorStore((state) => state.movePoint);
+  const selectPoint = useEditorStore((state) => state.selectPoint);
+  const movePoints = useEditorStore((state) => state.movePoints);
   const beginGesture = useEditorStore((state) => state.beginGesture);
   const endGesture = useEditorStore((state) => state.endGesture);
 
   const [isDragging, setIsDragging] = useState(false);
   const [isGizmoDragging, setIsGizmoDragging] = useState(false);
+
   const dragPointId = useRef<string | null>(null);
-  const dragY = useRef(0);
+  const dragIds = useRef<string[]>([]);
+  const dragStartPositions = useRef(new Map<string, Vec3Tuple>());
+  const dragStartHit = useRef(new Vector3());
   const dragMoved = useRef(false);
   const suppressClickFor = useRef<string | null>(null);
+
   const gizmoTarget = useRef<Group>(null);
+  const gizmoStartCenter = useRef(new Vector3());
+  const gizmoStartPositions = useRef(new Map<string, Vec3Tuple>());
+
   const dragPlane = useMemo(() => new Plane(new Vector3(0, 1, 0), 0), []);
   const dragHit = useMemo(() => new Vector3(), []);
 
-  const pointMap = useMemo(() => new Map(points.map((point) => [point.id, point.position])), [points]);
-  const selectedPoint = selectedIds.length === 1
-    ? points.find((point) => point.id === selectedIds[0])
-    : undefined;
+  const pointMap = useMemo(
+    () => new Map(points.map((point) => [point.id, point.position])),
+    [points]
+  );
+  const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds]);
+  const selectedPoints = useMemo(
+    () => points.filter((point) => selectedSet.has(point.id)),
+    [points, selectedSet]
+  );
+  const selectionCenter = useMemo<Vec3Tuple | null>(() => {
+    if (selectedPoints.length === 0) return null;
+
+    const sum = selectedPoints.reduce(
+      (acc, point) => {
+        acc[0] += point.position[0];
+        acc[1] += point.position[1];
+        acc[2] += point.position[2];
+        return acc;
+      },
+      [0, 0, 0] as Vec3Tuple
+    );
+
+    return [
+      sum[0] / selectedPoints.length,
+      sum[1] / selectedPoints.length,
+      sum[2] / selectedPoints.length,
+    ];
+  }, [selectedPoints]);
 
   const handleFloorClick = (event: ThreeEvent<MouseEvent>) => {
     event.stopPropagation();
@@ -122,7 +153,10 @@ function Scene({ cameraRequest }: { cameraRequest: CameraRequest }) {
 
     event.stopPropagation();
     if (dragMoved.current) suppressClickFor.current = pointId;
+
     dragPointId.current = null;
+    dragIds.current = [];
+    dragStartPositions.current = new Map();
     dragMoved.current = false;
     setIsDragging(false);
     endGesture();
@@ -153,7 +187,11 @@ function Scene({ cameraRequest }: { cameraRequest: CameraRequest }) {
         infiniteGrid
       />
 
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.04, 0]} onDoubleClick={handleFloorClick}>
+      <mesh
+        rotation={[-Math.PI / 2, 0, 0]}
+        position={[0, -0.04, 0]}
+        onDoubleClick={handleFloorClick}
+      >
         <planeGeometry args={[40, 40]} />
         <meshBasicMaterial transparent opacity={0} />
       </mesh>
@@ -162,11 +200,23 @@ function Scene({ cameraRequest }: { cameraRequest: CameraRequest }) {
         const a = pointMap.get(edge.a);
         const b = pointMap.get(edge.b);
         if (!a || !b) return null;
-        return <Line key={edge.id} points={[a, b]} color="#d9dce2" lineWidth={1.3} transparent opacity={0.72} />;
+
+        const selectedEdge = selectedSet.has(edge.a) && selectedSet.has(edge.b);
+
+        return (
+          <Line
+            key={edge.id}
+            points={[a, b]}
+            color={selectedEdge ? "#ff8a68" : "#d9dce2"}
+            lineWidth={selectedEdge ? 2 : 1.3}
+            transparent
+            opacity={selectedEdge ? 0.95 : 0.72}
+          />
+        );
       })}
 
       {points.map((point) => {
-        const selected = selectedIds.includes(point.id);
+        const selected = selectedSet.has(point.id);
 
         return (
           <mesh
@@ -177,14 +227,35 @@ function Scene({ cameraRequest }: { cameraRequest: CameraRequest }) {
               if (event.button !== 0 || isGizmoDragging) return;
               event.stopPropagation();
 
-              beginGesture();
-              dragPointId.current = point.id;
-              dragY.current = point.position[1];
-              dragMoved.current = false;
+              const movingIds =
+                selected && selectedIds.length > 1
+                  ? [...selectedIds]
+                  : [point.id];
+
+              if (!selected) {
+                selectPoint(point.id);
+              }
+
               dragPlane.setFromNormalAndCoplanarPoint(
                 new Vector3(0, 1, 0),
                 new Vector3(0, point.position[1], 0)
               );
+
+              const hit = event.ray.intersectPlane(dragPlane, dragStartHit.current);
+              if (!hit) return;
+
+              beginGesture();
+              dragPointId.current = point.id;
+              dragIds.current = movingIds;
+              dragStartPositions.current = new Map(
+                movingIds.flatMap((id) => {
+                  const position = pointMap.get(id);
+                  return position
+                    ? [[id, [...position] as Vec3Tuple] as const]
+                    : [];
+                })
+              );
+              dragMoved.current = false;
               setIsDragging(true);
 
               const target = event.target as unknown as {
@@ -199,39 +270,60 @@ function Scene({ cameraRequest }: { cameraRequest: CameraRequest }) {
               const hit = event.ray.intersectPlane(dragPlane, dragHit);
               if (!hit) return;
 
-              const position: Vec3Tuple = [
-                snapCoordinate(hit.x, snapToGrid),
-                dragY.current,
-                snapCoordinate(hit.z, snapToGrid),
-              ];
-              const current = pointMap.get(point.id);
+              const anchor = dragStartPositions.current.get(point.id);
+              if (!anchor) return;
 
-              if (
-                current &&
-                (current[0] !== position[0] || current[1] !== position[1] || current[2] !== position[2])
-              ) {
+              const rawDx = hit.x - dragStartHit.current.x;
+              const rawDz = hit.z - dragStartHit.current.z;
+              const targetX = snapCoordinate(anchor[0] + rawDx, snapToGrid);
+              const targetZ = snapCoordinate(anchor[2] + rawDz, snapToGrid);
+              const dx = targetX - anchor[0];
+              const dz = targetZ - anchor[2];
+
+              if (Math.abs(dx) > 0.0001 || Math.abs(dz) > 0.0001) {
                 dragMoved.current = true;
-                movePoint(point.id, position);
               }
+
+              movePoints(
+                dragIds.current.flatMap((id) => {
+                  const start = dragStartPositions.current.get(id);
+                  if (!start) return [];
+
+                  return [{
+                    id,
+                    position: [
+                      start[0] + dx,
+                      start[1],
+                      start[2] + dz,
+                    ] as Vec3Tuple,
+                  }];
+                })
+              );
             }}
             onPointerUp={(event) => finishDrag(event, point.id)}
             onClick={(event) => {
               event.stopPropagation();
+
               if (suppressClickFor.current === point.id) {
                 suppressClickFor.current = null;
                 return;
               }
-              togglePoint(point.id);
+
+              const additive = event.shiftKey || event.ctrlKey || event.metaKey;
+              selectPoint(point.id, additive);
             }}
             onDoubleClick={(event) => event.stopPropagation()}
           >
             <sphereGeometry args={[0.105, 32, 32]} />
-            <meshStandardMaterial color={selected ? "#ff7a59" : "#f4f5f6"} emissive={selected ? "#8e2c16" : "#25272b"} />
+            <meshStandardMaterial
+              color={selected ? "#ff7a59" : "#f4f5f6"}
+              emissive={selected ? "#8e2c16" : "#25272b"}
+            />
           </mesh>
         );
       })}
 
-      {selectedPoint && (
+      {selectionCenter && (
         <TransformControls
           mode="translate"
           space="world"
@@ -240,25 +332,45 @@ function Scene({ cameraRequest }: { cameraRequest: CameraRequest }) {
           onMouseDown={() => {
             beginGesture();
             setIsGizmoDragging(true);
+
+            gizmoStartCenter.current.set(
+              selectionCenter[0],
+              selectionCenter[1],
+              selectionCenter[2]
+            );
+            gizmoStartPositions.current = new Map(
+              selectedPoints.map((point) => [
+                point.id,
+                [...point.position] as Vec3Tuple,
+              ])
+            );
           }}
           onObjectChange={() => {
             const target = gizmoTarget.current;
             if (!target) return;
 
-            const position: Vec3Tuple = [
-              snapCoordinate(target.position.x, snapToGrid),
-              snapCoordinate(target.position.y, snapToGrid),
-              snapCoordinate(target.position.z, snapToGrid),
-            ];
+            const dx = target.position.x - gizmoStartCenter.current.x;
+            const dy = target.position.y - gizmoStartCenter.current.y;
+            const dz = target.position.z - gizmoStartCenter.current.z;
 
-            movePoint(selectedPoint.id, position);
+            movePoints(
+              Array.from(gizmoStartPositions.current.entries()).map(([id, start]) => ({
+                id,
+                position: [
+                  start[0] + dx,
+                  start[1] + dy,
+                  start[2] + dz,
+                ] as Vec3Tuple,
+              }))
+            );
           }}
           onMouseUp={() => {
             setIsGizmoDragging(false);
+            gizmoStartPositions.current = new Map();
             endGesture();
           }}
         >
-          <group ref={gizmoTarget} position={selectedPoint.position} />
+          <group ref={gizmoTarget} position={selectionCenter} />
         </TransformControls>
       )}
 
@@ -277,7 +389,11 @@ function Scene({ cameraRequest }: { cameraRequest: CameraRequest }) {
 
 export function GeometryCanvas({ cameraRequest }: { cameraRequest: CameraRequest }) {
   return (
-    <Canvas camera={{ position: [6.5, 5.2, 7.2], fov: 45 }} dpr={[1, 2]} gl={{ antialias: true }}>
+    <Canvas
+      camera={{ position: [6.5, 5.2, 7.2], fov: 45 }}
+      dpr={[1, 2]}
+      gl={{ antialias: true }}
+    >
       <Scene cameraRequest={cameraRequest} />
     </Canvas>
   );
