@@ -287,7 +287,7 @@ export function EditorShell({ initialArtworkId = null }: EditorShellProps) {
         <div className="canvas-wrap">
           <GeometryCanvas />
           <div className="canvas-hint">
-            <strong>Double-click</strong> grid to add · <strong>drag a point</strong> to move · drag empty space to orbit · scroll to zoom
+            <strong>Click</strong> a point for XYZ gizmo · <strong>drag arrows</strong> to move in 3D · drag point for X/Z · drag empty space to orbit
           </div>
           <div className="dimension-badge">3D / XYZ</div>
           {loadStatus === "loading" && <div className="editor-notice">Loading saved artwork…</div>}
@@ -306,7 +306,7 @@ export function EditorShell({ initialArtworkId = null }: EditorShellProps) {
 
           <div className="inspector-section">
             <p className="eyebrow">Selection</p>
-            {selectedIds.length === 0 && <p className="muted">Select one point to edit it, drag a point across X/Z, or select two points to create a connection.</p>}
+            {selectedIds.length === 0 && <p className="muted">Select one point to reveal its X/Y/Z transform gizmo, or select two points to create a connection.</p>}
             {selectedIds.length === 2 && (
               <>
                 <p className="muted">Two points selected.</p>
@@ -314,19 +314,22 @@ export function EditorShell({ initialArtworkId = null }: EditorShellProps) {
               </>
             )}
             {selectedPoint && (
-              <div className="coordinate-panel">
-                {AXES.map(({ label, axis }) => (
-                  <label key={label}>
-                    <span>{label}</span>
-                    <input
-                      type="number"
-                      step="0.1"
-                      value={selectedPoint.position[axis]}
-                      onChange={(event) => updateSelectedAxis(axis, Number(event.target.value))}
-                    />
-                  </label>
-                ))}
-              </div>
+              <>
+                <p className="muted">Use the colored X/Y/Z arrows on the canvas for direct 3D movement, or type exact coordinates below.</p>
+                <div className="coordinate-panel">
+                  {AXES.map(({ label, axis }) => (
+                    <label key={label}>
+                      <span>{label}</span>
+                      <input
+                        type="number"
+                        step="0.1"
+                        value={selectedPoint.position[axis]}
+                        onChange={(event) => updateSelectedAxis(axis, Number(event.target.value))}
+                      />
+                    </label>
+                  ))}
+                </div>
+              </>
             )}
           </div>
 
