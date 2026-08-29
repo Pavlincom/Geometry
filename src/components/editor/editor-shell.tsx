@@ -2,14 +2,29 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { GeometryCanvas } from "./geometry-canvas";
-import { GeometryEdge, GeometryPoint, useEditorStore } from "@/lib/editor-store";
+import { CameraPreset, CameraRequest, GeometryCanvas } from "./geometry-canvas";
+import { GeometryEdge, GeometryPoint, PrimitiveKind, useEditorStore } from "@/lib/editor-store";
 import { createClient } from "@/lib/supabase/client";
 
 const AXES = [
   { label: "X", axis: 0 as const },
   { label: "Y", axis: 1 as const },
   { label: "Z", axis: 2 as const },
+];
+
+const PRIMITIVES: Array<{ kind: PrimitiveKind; label: string; mark: string }> = [
+  { kind: "cube", label: "Cube", mark: "□" },
+  { kind: "tetrahedron", label: "Tetra", mark: "△" },
+  { kind: "octahedron", label: "Octa", mark: "◇" },
+  { kind: "star", label: "Star", mark: "✦" },
+];
+
+const CAMERA_VIEWS: Array<{ preset: CameraPreset; label: string }> = [
+  { preset: "fit", label: "Fit" },
+  { preset: "iso", label: "Iso" },
+  { preset: "top", label: "Top" },
+  { preset: "front", label: "Front" },
+  { preset: "right", label: "Right" },
 ];
 
 type SaveStatus = "idle" | "saving" | "saved" | "error";
@@ -49,6 +64,7 @@ export function EditorShell({ initialArtworkId = null }: EditorShellProps) {
   const historyFuture = useEditorStore((state) => state.historyFuture);
   const connectSelected = useEditorStore((state) => state.connectSelected);
   const updateSelectedAxis = useEditorStore((state) => state.updateSelectedAxis);
+  const insertPrimitive = useEditorStore((state) => state.insertPrimitive);
   const deleteSelected = useEditorStore((state) => state.deleteSelected);
   const loadDocument = useEditorStore((state) => state.loadDocument);
   const reset = useEditorStore((state) => state.reset);
@@ -62,11 +78,22 @@ export function EditorShell({ initialArtworkId = null }: EditorShellProps) {
   const [saveError, setSaveError] = useState("");
   const [loadStatus, setLoadStatus] = useState<LoadStatus>(initialArtworkId ? "loading" : "idle");
   const [loadError, setLoadError] = useState("");
+  const [showForms, setShowForms] = useState(false);
+  const [cameraRequest, setCameraRequest] = useState<CameraRequest>({ preset: "iso", version: 0 });
   const skipDirtyEffect = useRef(false);
 
   const canUndo = historyPast.length > 0;
   const canRedo = historyFuture.length > 0;
   const selectedPoint = selectedIds.length === 1 ? points.find((point) => point.id === selectedIds[0]) : undefined;
+
+  function requestCamera(preset: CameraPreset) {
+    setCameraRequest((current) => ({ preset, version: current.version + 1 }));
+  }
+
+  function addPrimitive(kind: PrimitiveKind) {
+    insertPrimitive(kind);
+    requestCamera("fit");
+  }
 
   useEffect(() => {
     if (skipDirtyEffect.current) {
@@ -114,6 +141,7 @@ export function EditorShell({ initialArtworkId = null }: EditorShellProps) {
         setArtworkId(data.id);
         setSaveStatus("saved");
         setLoadStatus("idle");
+        requestCamera("fit");
       } catch (error) {
         if (cancelled) return;
         const message = error && typeof error === "object" && "message" in error
@@ -271,7 +299,15 @@ export function EditorShell({ initialArtworkId = null }: EditorShellProps) {
         <aside className="tool-rail" aria-label="Studio tools">
           <div className="tool active">●<span>Points</span></div>
           <div className="tool">╱<span>Edges</span></div>
-          <div className="tool">◇<span>Forms</span></div>
+          <button
+            className={`tool tool-button ${showForms ? "active" : ""}`}
+            type="button"
+            aria-pressed={showForms}
+            onClick={() => setShowForms((value) => !value)}
+            title="Insert geometric forms"
+          >
+            ◇<span>Forms</span>
+          </button>
           <button
             className={`tool tool-button ${snapToGrid ? "active" : ""}`}
             type="button"
@@ -285,9 +321,38 @@ export function EditorShell({ initialArtworkId = null }: EditorShellProps) {
         </aside>
 
         <div className="canvas-wrap">
-          <GeometryCanvas />
+          <GeometryCanvas cameraRequest={cameraRequest} />
+
+          <div className="view-toolbar" aria-label="Camera views">
+            {CAMERA_VIEWS.map((view) => (
+              <button key={view.preset} type="button" onClick={() => requestCamera(view.preset)}>
+                {view.label}
+              </button>
+            ))}
+          </div>
+
+          {showForms && (
+            <div className="forms-popover">
+              <div className="forms-popover-head">
+                <div>
+                  <strong>Insert form</strong>
+                  <span>Adds a connected structure</span>
+                </div>
+                <button type="button" aria-label="Close forms" onClick={() => setShowForms(false)}>×</button>
+              </div>
+              <div className="primitive-grid">
+                {PRIMITIVES.map((primitive) => (
+                  <button key={primitive.kind} type="button" onClick={() => addPrimitive(primitive.kind)}>
+                    <span>{primitive.mark}</span>
+                    {primitive.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="canvas-hint">
-            <strong>Click</strong> a point for XYZ gizmo · <strong>drag arrows</strong> to move in 3D · drag point for X/Z · drag empty space to orbit
+            <strong>Click</strong> a point for XYZ gizmo · <strong>Forms</strong> inserts ready structures · use View buttons to frame the scene
           </div>
           <div className="dimension-badge">3D / XYZ</div>
           {loadStatus === "loading" && <div className="editor-notice">Loading saved artwork…</div>}
@@ -302,6 +367,18 @@ export function EditorShell({ initialArtworkId = null }: EditorShellProps) {
             <div className="stats-row"><span>Connections</span><strong>{edges.length}</strong></div>
             <div className="stats-row"><span>Snap</span><strong>{snapToGrid ? "0.5 on" : "Off"}</strong></div>
             {artworkId && <div className="stats-row"><span>Cloud</span><strong>Saved</strong></div>}
+          </div>
+
+          <div className="inspector-section">
+            <p className="eyebrow">Views</p>
+            <p className="muted">Jump to an architectural view or fit the whole structure into frame.</p>
+            <div className="inspector-button-grid">
+              {CAMERA_VIEWS.map((view) => (
+                <button key={view.preset} type="button" onClick={() => requestCamera(view.preset)}>
+                  {view.label}
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="inspector-section">
