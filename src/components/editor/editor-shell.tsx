@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { GeometryCanvas } from "./geometry-canvas";
-import { useEditorStore } from "@/lib/editor-store";
+import { GeometryEdge, GeometryPoint, useEditorStore } from "@/lib/editor-store";
 import { createClient } from "@/lib/supabase/client";
 
 const AXES = [
@@ -13,26 +13,115 @@ const AXES = [
 ];
 
 type SaveStatus = "idle" | "saving" | "saved" | "error";
+type LoadStatus = "idle" | "loading" | "error";
 
-export function EditorShell() {
+type EditorShellProps = {
+  initialArtworkId?: string | null;
+};
+
+function isGeometryPointArray(value: unknown): value is GeometryPoint[] {
+  return Array.isArray(value) && value.every((point) => {
+    if (!point || typeof point !== "object") return false;
+    const candidate = point as Partial<GeometryPoint>;
+    return (
+      typeof candidate.id === "string" &&
+      Array.isArray(candidate.position) &&
+      candidate.position.length === 3 &&
+      candidate.position.every((coordinate) => typeof coordinate === "number")
+    );
+  });
+}
+
+function isGeometryEdgeArray(value: unknown): value is GeometryEdge[] {
+  return Array.isArray(value) && value.every((edge) => {
+    if (!edge || typeof edge !== "object") return false;
+    const candidate = edge as Partial<GeometryEdge>;
+    return typeof candidate.id === "string" && typeof candidate.a === "string" && typeof candidate.b === "string";
+  });
+}
+
+export function EditorShell({ initialArtworkId = null }: EditorShellProps) {
   const points = useEditorStore((state) => state.points);
   const edges = useEditorStore((state) => state.edges);
   const selectedIds = useEditorStore((state) => state.selectedIds);
   const connectSelected = useEditorStore((state) => state.connectSelected);
   const updateSelectedAxis = useEditorStore((state) => state.updateSelectedAxis);
   const deleteSelected = useEditorStore((state) => state.deleteSelected);
+  const loadDocument = useEditorStore((state) => state.loadDocument);
   const reset = useEditorStore((state) => state.reset);
 
   const [title, setTitle] = useState("Untitled structure");
   const [artworkId, setArtworkId] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const [saveError, setSaveError] = useState("");
+  const [loadStatus, setLoadStatus] = useState<LoadStatus>(initialArtworkId ? "loading" : "idle");
+  const [loadError, setLoadError] = useState("");
+  const skipDirtyEffect = useRef(false);
 
   const selectedPoint = selectedIds.length === 1 ? points.find((point) => point.id === selectedIds[0]) : undefined;
 
   useEffect(() => {
+    if (skipDirtyEffect.current) {
+      skipDirtyEffect.current = false;
+      return;
+    }
     setSaveStatus((current) => (current === "saved" ? "idle" : current));
   }, [points, edges, title]);
+
+  useEffect(() => {
+    if (!initialArtworkId) return;
+
+    let cancelled = false;
+
+    async function loadArtwork() {
+      setLoadStatus("loading");
+      setLoadError("");
+
+      try {
+        const supabase = createClient();
+        const { data: sessionData } = await supabase.auth.getSession();
+        const userId = sessionData.session?.user.id;
+
+        if (!userId) {
+          throw new Error("This saved artwork belongs to a Geometry browser session that is no longer available.");
+        }
+
+        const { data, error } = await supabase
+          .from("artworks")
+          .select("id,title,points,edges")
+          .eq("id", initialArtworkId)
+          .eq("user_id", userId)
+          .single();
+
+        if (error) throw error;
+        if (!isGeometryPointArray(data.points) || !isGeometryEdgeArray(data.edges)) {
+          throw new Error("This artwork contains geometry data that cannot be opened.");
+        }
+
+        if (cancelled) return;
+
+        skipDirtyEffect.current = true;
+        loadDocument(data.points, data.edges);
+        setTitle(data.title);
+        setArtworkId(data.id);
+        setSaveStatus("saved");
+        setLoadStatus("idle");
+      } catch (error) {
+        if (cancelled) return;
+        const message = error && typeof error === "object" && "message" in error
+          ? String(error.message)
+          : "Could not open this saved artwork.";
+        setLoadError(message);
+        setLoadStatus("error");
+      }
+    }
+
+    loadArtwork();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [initialArtworkId, loadDocument]);
 
   async function saveArtwork() {
     setSaveStatus("saving");
@@ -122,15 +211,22 @@ export function EditorShell() {
             }}
           />
           <span>
-            {saveStatus === "saving" && "• Saving"}
-            {saveStatus === "saved" && "• Saved"}
-            {saveStatus === "error" && "• Save failed"}
-            {saveStatus === "idle" && "• Draft"}
+            {loadStatus === "loading" && "• Loading"}
+            {loadStatus !== "loading" && saveStatus === "saving" && "• Saving"}
+            {loadStatus !== "loading" && saveStatus === "saved" && "• Saved"}
+            {loadStatus !== "loading" && saveStatus === "error" && "• Save failed"}
+            {loadStatus !== "loading" && saveStatus === "idle" && "• Draft"}
           </span>
         </div>
         <div className="editor-header-actions">
+          <Link className="ghost-button" href="/artworks">My artworks</Link>
           <button className="ghost-button" type="button" onClick={reset}>Reset</button>
-          <button className="studio-button" type="button" disabled={saveStatus === "saving"} onClick={saveArtwork}>
+          <button
+            className="studio-button"
+            type="button"
+            disabled={saveStatus === "saving" || loadStatus === "loading"}
+            onClick={saveArtwork}
+          >
             {saveStatus === "saving" ? "Saving…" : artworkId ? "Save changes" : "Save"}
           </button>
         </div>
@@ -148,26 +244,9 @@ export function EditorShell() {
           <GeometryCanvas />
           <div className="canvas-hint"><strong>Double-click</strong> the grid to add a point · drag to orbit · scroll to zoom</div>
           <div className="dimension-badge">3D / XYZ</div>
-          {saveStatus === "error" && (
-            <div
-              role="status"
-              style={{
-                position: "absolute",
-                top: 16,
-                right: 16,
-                maxWidth: 330,
-                border: "1px solid rgba(255,255,255,.12)",
-                borderRadius: 9,
-                background: "rgba(112, 42, 31, .94)",
-                color: "#fff",
-                padding: "10px 12px",
-                fontSize: 11,
-                lineHeight: 1.45,
-              }}
-            >
-              {saveError}
-            </div>
-          )}
+          {loadStatus === "loading" && <div className="editor-notice">Loading saved artwork…</div>}
+          {loadStatus === "error" && <div className="editor-notice error">{loadError}</div>}
+          {saveStatus === "error" && <div className="editor-notice error">{saveError}</div>}
         </div>
 
         <aside className="inspector">

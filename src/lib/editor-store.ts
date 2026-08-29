@@ -13,6 +13,7 @@ type EditorState = {
   connectSelected: () => void;
   updateSelectedAxis: (axis: 0 | 1 | 2, value: number) => void;
   deleteSelected: () => void;
+  loadDocument: (points: GeometryPoint[], edges: GeometryEdge[]) => void;
   reset: () => void;
 };
 
@@ -86,6 +87,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         edges: state.edges.filter((edge) => !selected.has(edge.a) && !selected.has(edge.b)),
         selectedIds: [],
       };
+    }),
+
+  loadDocument: (points, edges) =>
+    set({
+      points: points.map((point) => ({ ...point, position: [...point.position] as Vec3Tuple })),
+      edges: edges.map((edge) => ({ ...edge })),
+      selectedIds: [],
     }),
 
   reset: () => set({ points: cloneInitialPoints(), edges: cloneInitialEdges(), selectedIds: [] }),
