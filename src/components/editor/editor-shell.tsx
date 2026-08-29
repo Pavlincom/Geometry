@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { CameraPreset, CameraRequest, GeometryCanvas } from "./geometry-canvas";
+import styles from "./editor-controls.module.css";
 import { GeometryEdge, GeometryPoint, PrimitiveKind, useEditorStore } from "@/lib/editor-store";
 import { createClient } from "@/lib/supabase/client";
 
@@ -323,7 +324,7 @@ export function EditorShell({ initialArtworkId = null }: EditorShellProps) {
         <div className="canvas-wrap">
           <GeometryCanvas cameraRequest={cameraRequest} />
 
-          <div className="view-toolbar" aria-label="Camera views">
+          <div className={styles.viewToolbar} aria-label="Camera views">
             {CAMERA_VIEWS.map((view) => (
               <button key={view.preset} type="button" onClick={() => requestCamera(view.preset)}>
                 {view.label}
@@ -332,15 +333,15 @@ export function EditorShell({ initialArtworkId = null }: EditorShellProps) {
           </div>
 
           {showForms && (
-            <div className="forms-popover">
-              <div className="forms-popover-head">
+            <div className={styles.formsPopover}>
+              <div className={styles.formsPopoverHead}>
                 <div>
                   <strong>Insert form</strong>
                   <span>Adds a connected structure</span>
                 </div>
                 <button type="button" aria-label="Close forms" onClick={() => setShowForms(false)}>×</button>
               </div>
-              <div className="primitive-grid">
+              <div className={styles.primitiveGrid}>
                 {PRIMITIVES.map((primitive) => (
                   <button key={primitive.kind} type="button" onClick={() => addPrimitive(primitive.kind)}>
                     <span>{primitive.mark}</span>
@@ -372,7 +373,7 @@ export function EditorShell({ initialArtworkId = null }: EditorShellProps) {
           <div className="inspector-section">
             <p className="eyebrow">Views</p>
             <p className="muted">Jump to an architectural view or fit the whole structure into frame.</p>
-            <div className="inspector-button-grid">
+            <div className={styles.inspectorButtonGrid}>
               {CAMERA_VIEWS.map((view) => (
                 <button key={view.preset} type="button" onClick={() => requestCamera(view.preset)}>
                   {view.label}
