@@ -73,6 +73,7 @@ button { cursor: pointer; }
 .editor-title span { color: #767981; }
 .editor-header-actions { display: flex; gap: 8px; align-items: center; }
 .ghost-button, .studio-button, .wide-action, .danger-action { border: 1px solid rgba(255,255,255,.14); background: transparent; color: #f7f7f5; border-radius: 9px; padding: 9px 13px; font-size: 12px; }
+.ghost-button:disabled { opacity: .34; cursor: default; }
 .studio-button { background: #f3f1eb; color: #111216; border-color: #f3f1eb; }
 .studio-button:disabled { opacity: .55; cursor: wait; }
 .editor-layout { height: calc(100vh - 64px); display: grid; grid-template-columns: 72px 1fr 286px; }
@@ -81,6 +82,8 @@ button { cursor: pointer; }
 .tool span { font-size: 9px; letter-spacing: .04em; }
 .tool.active { background: #202227; color: white; }
 .tool.disabled { margin-top: auto; opacity: .35; }
+.tool-button { width: 100%; border: 0; padding: 0; background: transparent; font: inherit; }
+.tool-button:focus-visible { outline: 1px solid rgba(255,255,255,.38); outline-offset: 2px; }
 .canvas-wrap { position: relative; min-width: 0; }
 .canvas-wrap canvas { display: block; }
 .canvas-hint { position: absolute; left: 18px; bottom: 18px; background: rgba(13,14,17,.78); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,.1); color: #9da0a7; padding: 10px 12px; border-radius: 9px; font-size: 11px; pointer-events: none; }
