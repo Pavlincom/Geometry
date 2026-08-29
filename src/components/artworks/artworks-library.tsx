@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { SiteFooter, SiteHeader } from "@/components/site/site-header";
 import type { GeometryEdge, GeometryPoint } from "@/lib/editor-store";
 import { createClient } from "@/lib/supabase/client";
 
@@ -163,19 +164,13 @@ export function ArtworksLibrary() {
 
   return (
     <main className="library-page">
-      <header className="site-header library-header">
-        <Link className="brand" href="/">GEOMETRY°</Link>
-        <nav className="nav-links" aria-label="Collection navigation">
-          <Link href="/">Explore</Link>
-          <Link className="nav-cta" href="/create">New structure</Link>
-        </nav>
-      </header>
+      <SiteHeader active="artworks" sticky />
 
       <section className="library-hero">
         <div>
           <p className="eyebrow">Personal collection</p>
           <h1>My artworks</h1>
-          <p>Your saved coordinate structures, ready to reopen and keep evolving.</p>
+          <p>Your saved coordinate structures, ready to reopen and keep evolving as editable geometry.</p>
         </div>
         <Link className="primary-button" href="/create">Create new ↗</Link>
       </section>
@@ -231,6 +226,7 @@ export function ArtworksLibrary() {
       )}
 
       {message && loadState === "ready" && artworks.length > 0 && <div className="library-toast">{message}</div>}
+      <SiteFooter />
     </main>
   );
 }
