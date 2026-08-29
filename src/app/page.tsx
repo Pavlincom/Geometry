@@ -26,6 +26,7 @@ export default function Home() {
         <nav className="nav-links" aria-label="Primary navigation">
           <a href="#explore">Explore</a>
           <a href="#dimensions">Dimensions</a>
+          <Link href="/artworks">My artworks</Link>
           <Link className="nav-cta" href="/create">Open studio</Link>
         </nav>
       </header>
