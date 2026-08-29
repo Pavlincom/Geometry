@@ -3,6 +3,7 @@ import { create } from "zustand";
 export type Vec3Tuple = [number, number, number];
 export type GeometryPoint = { id: string; position: Vec3Tuple };
 export type GeometryEdge = { id: string; a: string; b: string };
+export type PrimitiveKind = "cube" | "tetrahedron" | "octahedron" | "star";
 
 type GeometrySnapshot = {
   points: GeometryPoint[];
@@ -18,6 +19,7 @@ type EditorState = {
   historyFuture: GeometrySnapshot[];
   gestureStart: GeometrySnapshot | null;
   addPoint: (position: Vec3Tuple) => void;
+  insertPrimitive: (kind: PrimitiveKind) => void;
   togglePoint: (id: string) => void;
   connectSelected: () => void;
   updateSelectedAxis: (axis: 0 | 1 | 2, value: number) => void;
@@ -87,6 +89,64 @@ const snapshotsEqual = (a: GeometrySnapshot, b: GeometrySnapshot) => {
 const pushHistory = (history: GeometrySnapshot[], snapshot: GeometrySnapshot) =>
   [...history.slice(-(HISTORY_LIMIT - 1)), snapshot];
 
+const completeGraphEdges = (indices: number[]) => {
+  const edges: Array<[number, number]> = [];
+  for (let a = 0; a < indices.length; a += 1) {
+    for (let b = a + 1; b < indices.length; b += 1) {
+      edges.push([indices[a], indices[b]]);
+    }
+  }
+  return edges;
+};
+
+function primitiveDefinition(kind: PrimitiveKind): {
+  positions: Vec3Tuple[];
+  edges: Array<[number, number]>;
+} {
+  if (kind === "cube") {
+    return {
+      positions: [
+        [-1, 0, -1], [1, 0, -1], [1, 0, 1], [-1, 0, 1],
+        [-1, 2, -1], [1, 2, -1], [1, 2, 1], [-1, 2, 1],
+      ],
+      edges: [
+        [0, 1], [1, 2], [2, 3], [3, 0],
+        [4, 5], [5, 6], [6, 7], [7, 4],
+        [0, 4], [1, 5], [2, 6], [3, 7],
+      ],
+    };
+  }
+
+  if (kind === "tetrahedron") {
+    return {
+      positions: [[-1, 0, -1], [1, 0, -1], [0, 0, 1], [0, 2, 0]],
+      edges: completeGraphEdges([0, 1, 2, 3]),
+    };
+  }
+
+  if (kind === "octahedron") {
+    return {
+      positions: [[-1, 1, 0], [1, 1, 0], [0, 1, -1], [0, 1, 1], [0, 0, 0], [0, 2, 0]],
+      edges: [
+        [0, 2], [2, 1], [1, 3], [3, 0],
+        [4, 0], [4, 1], [4, 2], [4, 3],
+        [5, 0], [5, 1], [5, 2], [5, 3],
+      ],
+    };
+  }
+
+  return {
+    positions: [
+      [-1, 0, -1], [1, 0, -1], [1, 0, 1], [-1, 0, 1],
+      [-1, 2, -1], [1, 2, -1], [1, 2, 1], [-1, 2, 1],
+    ],
+    edges: [
+      ...completeGraphEdges([0, 2, 5, 7]),
+      ...completeGraphEdges([1, 3, 4, 6]),
+    ],
+  };
+}
+
 export const useEditorStore = create<EditorState>((set) => ({
   points: cloneInitialPoints(),
   edges: cloneInitialEdges(),
@@ -103,6 +163,35 @@ export const useEditorStore = create<EditorState>((set) => ({
       historyPast: pushHistory(state.historyPast, snapshotFrom(state)),
       historyFuture: [],
     })),
+
+  insertPrimitive: (kind) =>
+    set((state) => {
+      const definition = primitiveDefinition(kind);
+      const baseId = crypto.randomUUID();
+      const maxX = state.points.length > 0
+        ? Math.max(...state.points.map((point) => point.position[0]))
+        : -3;
+      const centerX = state.points.length > 0 ? Math.ceil((maxX + 3) * 2) / 2 : 0;
+
+      const newPoints = definition.positions.map((position, index) => ({
+        id: `${baseId}-p${index}`,
+        position: [position[0] + centerX, position[1], position[2]] as Vec3Tuple,
+      }));
+
+      const newEdges = definition.edges.map(([a, b], index) => ({
+        id: `${baseId}-e${index}`,
+        a: newPoints[a].id,
+        b: newPoints[b].id,
+      }));
+
+      return {
+        points: [...state.points, ...newPoints],
+        edges: [...state.edges, ...newEdges],
+        selectedIds: [],
+        historyPast: pushHistory(state.historyPast, snapshotFrom(state)),
+        historyFuture: [],
+      };
+    }),
 
   togglePoint: (id) =>
     set((state) => {
