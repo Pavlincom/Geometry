@@ -2,24 +2,59 @@
 
 import { Grid, Line, OrbitControls } from "@react-three/drei";
 import { Canvas, ThreeEvent } from "@react-three/fiber";
-import { useMemo } from "react";
-import { Color } from "three";
-import { useEditorStore } from "@/lib/editor-store";
+import { useMemo, useRef, useState } from "react";
+import { Color, Plane, Vector3 } from "three";
+import { useEditorStore, Vec3Tuple } from "@/lib/editor-store";
+
+const GRID_STEP = 0.5;
+
+function snapCoordinate(value: number, enabled: boolean) {
+  if (enabled) return Math.round(value / GRID_STEP) * GRID_STEP;
+  return Math.round(value * 100) / 100;
+}
 
 function Scene() {
   const points = useEditorStore((state) => state.points);
   const edges = useEditorStore((state) => state.edges);
   const selectedIds = useEditorStore((state) => state.selectedIds);
+  const snapToGrid = useEditorStore((state) => state.snapToGrid);
   const addPoint = useEditorStore((state) => state.addPoint);
   const togglePoint = useEditorStore((state) => state.togglePoint);
+  const movePoint = useEditorStore((state) => state.movePoint);
+  const beginGesture = useEditorStore((state) => state.beginGesture);
+  const endGesture = useEditorStore((state) => state.endGesture);
+
+  const [isDragging, setIsDragging] = useState(false);
+  const dragPointId = useRef<string | null>(null);
+  const dragY = useRef(0);
+  const dragMoved = useRef(false);
+  const suppressClickFor = useRef<string | null>(null);
+  const dragPlane = useMemo(() => new Plane(new Vector3(0, 1, 0), 0), []);
+  const dragHit = useMemo(() => new Vector3(), []);
 
   const pointMap = useMemo(() => new Map(points.map((point) => [point.id, point.position])), [points]);
 
   const handleFloorClick = (event: ThreeEvent<MouseEvent>) => {
     event.stopPropagation();
-    const x = Math.round(event.point.x * 10) / 10;
-    const z = Math.round(event.point.z * 10) / 10;
+    const x = snapCoordinate(event.point.x, snapToGrid);
+    const z = snapCoordinate(event.point.z, snapToGrid);
     addPoint([x, 0, z]);
+  };
+
+  const finishDrag = (event: ThreeEvent<PointerEvent>, pointId: string) => {
+    if (dragPointId.current !== pointId) return;
+
+    event.stopPropagation();
+    if (dragMoved.current) suppressClickFor.current = pointId;
+    dragPointId.current = null;
+    dragMoved.current = false;
+    setIsDragging(false);
+    endGesture();
+
+    const target = event.target as unknown as {
+      releasePointerCapture?: (pointerId: number) => void;
+    };
+    target.releasePointerCapture?.(event.pointerId);
   };
 
   return (
@@ -31,7 +66,7 @@ function Scene() {
       <Grid
         position={[0, -0.02, 0]}
         args={[30, 30]}
-        cellSize={0.5}
+        cellSize={GRID_STEP}
         cellThickness={0.45}
         cellColor="#2b2e34"
         sectionSize={2.5}
@@ -56,15 +91,63 @@ function Scene() {
 
       {points.map((point) => {
         const selected = selectedIds.includes(point.id);
+
         return (
           <mesh
             key={point.id}
             position={point.position}
             scale={selected ? 1.35 : 1}
+            onPointerDown={(event) => {
+              if (event.button !== 0) return;
+              event.stopPropagation();
+
+              beginGesture();
+              dragPointId.current = point.id;
+              dragY.current = point.position[1];
+              dragMoved.current = false;
+              dragPlane.setFromNormalAndCoplanarPoint(
+                new Vector3(0, 1, 0),
+                new Vector3(0, point.position[1], 0)
+              );
+              setIsDragging(true);
+
+              const target = event.target as unknown as {
+                setPointerCapture?: (pointerId: number) => void;
+              };
+              target.setPointerCapture?.(event.pointerId);
+            }}
+            onPointerMove={(event) => {
+              if (dragPointId.current !== point.id) return;
+              event.stopPropagation();
+
+              const hit = event.ray.intersectPlane(dragPlane, dragHit);
+              if (!hit) return;
+
+              const position: Vec3Tuple = [
+                snapCoordinate(hit.x, snapToGrid),
+                dragY.current,
+                snapCoordinate(hit.z, snapToGrid),
+              ];
+              const current = pointMap.get(point.id);
+
+              if (
+                current &&
+                (current[0] !== position[0] || current[1] !== position[1] || current[2] !== position[2])
+              ) {
+                dragMoved.current = true;
+                movePoint(point.id, position);
+              }
+            }}
+            onPointerUp={(event) => finishDrag(event, point.id)}
             onClick={(event) => {
               event.stopPropagation();
+              if (suppressClickFor.current === point.id) {
+                suppressClickFor.current = null;
+                return;
+              }
               togglePoint(point.id);
             }}
+            onDoubleClick={(event) => event.stopPropagation()}
           >
             <sphereGeometry args={[0.105, 32, 32]} />
             <meshStandardMaterial color={selected ? "#ff7a59" : "#f4f5f6"} emissive={selected ? "#8e2c16" : "#25272b"} />
@@ -72,7 +155,14 @@ function Scene() {
         );
       })}
 
-      <OrbitControls makeDefault enableDamping dampingFactor={0.07} minDistance={3} maxDistance={24} />
+      <OrbitControls
+        makeDefault
+        enabled={!isDragging}
+        enableDamping
+        dampingFactor={0.07}
+        minDistance={3}
+        maxDistance={24}
+      />
     </>
   );
 }

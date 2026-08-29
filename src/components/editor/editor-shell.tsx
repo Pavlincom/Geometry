@@ -44,11 +44,17 @@ export function EditorShell({ initialArtworkId = null }: EditorShellProps) {
   const points = useEditorStore((state) => state.points);
   const edges = useEditorStore((state) => state.edges);
   const selectedIds = useEditorStore((state) => state.selectedIds);
+  const snapToGrid = useEditorStore((state) => state.snapToGrid);
+  const historyPast = useEditorStore((state) => state.historyPast);
+  const historyFuture = useEditorStore((state) => state.historyFuture);
   const connectSelected = useEditorStore((state) => state.connectSelected);
   const updateSelectedAxis = useEditorStore((state) => state.updateSelectedAxis);
   const deleteSelected = useEditorStore((state) => state.deleteSelected);
   const loadDocument = useEditorStore((state) => state.loadDocument);
   const reset = useEditorStore((state) => state.reset);
+  const toggleSnap = useEditorStore((state) => state.toggleSnap);
+  const undo = useEditorStore((state) => state.undo);
+  const redo = useEditorStore((state) => state.redo);
 
   const [title, setTitle] = useState("Untitled structure");
   const [artworkId, setArtworkId] = useState<string | null>(null);
@@ -58,6 +64,8 @@ export function EditorShell({ initialArtworkId = null }: EditorShellProps) {
   const [loadError, setLoadError] = useState("");
   const skipDirtyEffect = useRef(false);
 
+  const canUndo = historyPast.length > 0;
+  const canRedo = historyFuture.length > 0;
   const selectedPoint = selectedIds.length === 1 ? points.find((point) => point.id === selectedIds[0]) : undefined;
 
   useEffect(() => {
@@ -122,6 +130,31 @@ export function EditorShell({ initialArtworkId = null }: EditorShellProps) {
       cancelled = true;
     };
   }, [initialArtworkId, loadDocument]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      const isTyping =
+        target?.tagName === "INPUT" ||
+        target?.tagName === "TEXTAREA" ||
+        target?.isContentEditable;
+
+      if (isTyping || (!event.metaKey && !event.ctrlKey)) return;
+
+      const key = event.key.toLowerCase();
+      if (key === "z") {
+        event.preventDefault();
+        if (event.shiftKey) redo();
+        else undo();
+      } else if (key === "y") {
+        event.preventDefault();
+        redo();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [redo, undo]);
 
   async function saveArtwork() {
     setSaveStatus("saving");
@@ -220,6 +253,8 @@ export function EditorShell({ initialArtworkId = null }: EditorShellProps) {
         </div>
         <div className="editor-header-actions">
           <Link className="ghost-button" href="/artworks">My artworks</Link>
+          <button className="ghost-button" type="button" disabled={!canUndo} onClick={undo} title="Undo (Ctrl/Cmd + Z)">Undo</button>
+          <button className="ghost-button" type="button" disabled={!canRedo} onClick={redo} title="Redo (Ctrl/Cmd + Shift + Z)">Redo</button>
           <button className="ghost-button" type="button" onClick={reset}>Reset</button>
           <button
             className="studio-button"
@@ -237,12 +272,23 @@ export function EditorShell({ initialArtworkId = null }: EditorShellProps) {
           <div className="tool active">●<span>Points</span></div>
           <div className="tool">╱<span>Edges</span></div>
           <div className="tool">◇<span>Forms</span></div>
+          <button
+            className={`tool tool-button ${snapToGrid ? "active" : ""}`}
+            type="button"
+            aria-pressed={snapToGrid}
+            onClick={toggleSnap}
+            title="Toggle 0.5-unit grid snapping"
+          >
+            ⌗<span>Snap 0.5</span>
+          </button>
           <div className="tool disabled">4D<span>Next</span></div>
         </aside>
 
         <div className="canvas-wrap">
           <GeometryCanvas />
-          <div className="canvas-hint"><strong>Double-click</strong> the grid to add a point · drag to orbit · scroll to zoom</div>
+          <div className="canvas-hint">
+            <strong>Double-click</strong> grid to add · <strong>drag a point</strong> to move · drag empty space to orbit · scroll to zoom
+          </div>
           <div className="dimension-badge">3D / XYZ</div>
           {loadStatus === "loading" && <div className="editor-notice">Loading saved artwork…</div>}
           {loadStatus === "error" && <div className="editor-notice error">{loadError}</div>}
@@ -254,12 +300,13 @@ export function EditorShell({ initialArtworkId = null }: EditorShellProps) {
             <p className="eyebrow">Structure</p>
             <div className="stats-row"><span>Points</span><strong>{points.length}</strong></div>
             <div className="stats-row"><span>Connections</span><strong>{edges.length}</strong></div>
+            <div className="stats-row"><span>Snap</span><strong>{snapToGrid ? "0.5 on" : "Off"}</strong></div>
             {artworkId && <div className="stats-row"><span>Cloud</span><strong>Saved</strong></div>}
           </div>
 
           <div className="inspector-section">
             <p className="eyebrow">Selection</p>
-            {selectedIds.length === 0 && <p className="muted">Select one point to edit it, or two points to create a connection.</p>}
+            {selectedIds.length === 0 && <p className="muted">Select one point to edit it, drag a point across X/Z, or select two points to create a connection.</p>}
             {selectedIds.length === 2 && (
               <>
                 <p className="muted">Two points selected.</p>
