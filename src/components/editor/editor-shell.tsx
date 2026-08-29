@@ -63,9 +63,16 @@ export function EditorShell({ initialArtworkId = null }: EditorShellProps) {
   const snapToGrid = useEditorStore((state) => state.snapToGrid);
   const historyPast = useEditorStore((state) => state.historyPast);
   const historyFuture = useEditorStore((state) => state.historyFuture);
+  const hasClipboard = useEditorStore((state) => state.clipboard !== null);
+
   const connectSelected = useEditorStore((state) => state.connectSelected);
   const updateSelectedAxis = useEditorStore((state) => state.updateSelectedAxis);
   const insertPrimitive = useEditorStore((state) => state.insertPrimitive);
+  const selectAll = useEditorStore((state) => state.selectAll);
+  const clearSelection = useEditorStore((state) => state.clearSelection);
+  const copySelected = useEditorStore((state) => state.copySelected);
+  const pasteClipboard = useEditorStore((state) => state.pasteClipboard);
+  const duplicateSelected = useEditorStore((state) => state.duplicateSelected);
   const deleteSelected = useEditorStore((state) => state.deleteSelected);
   const loadDocument = useEditorStore((state) => state.loadDocument);
   const reset = useEditorStore((state) => state.reset);
@@ -85,7 +92,11 @@ export function EditorShell({ initialArtworkId = null }: EditorShellProps) {
 
   const canUndo = historyPast.length > 0;
   const canRedo = historyFuture.length > 0;
-  const selectedPoint = selectedIds.length === 1 ? points.find((point) => point.id === selectedIds[0]) : undefined;
+  const hasSelection = selectedIds.length > 0;
+  const selectedPoint =
+    selectedIds.length === 1
+      ? points.find((point) => point.id === selectedIds[0])
+      : undefined;
 
   function requestCamera(preset: CameraPreset) {
     setCameraRequest((current) => ({ preset, version: current.version + 1 }));
@@ -145,9 +156,10 @@ export function EditorShell({ initialArtworkId = null }: EditorShellProps) {
         requestCamera("fit");
       } catch (error) {
         if (cancelled) return;
-        const message = error && typeof error === "object" && "message" in error
-          ? String(error.message)
-          : "Could not open this saved artwork.";
+        const message =
+          error && typeof error === "object" && "message" in error
+            ? String(error.message)
+            : "Could not open this saved artwork.";
         setLoadError(message);
         setLoadStatus("error");
       }
@@ -168,9 +180,26 @@ export function EditorShell({ initialArtworkId = null }: EditorShellProps) {
         target?.tagName === "TEXTAREA" ||
         target?.isContentEditable;
 
-      if (isTyping || (!event.metaKey && !event.ctrlKey)) return;
+      if (isTyping) return;
 
       const key = event.key.toLowerCase();
+
+      if (key === "escape") {
+        clearSelection();
+        return;
+      }
+
+      if (key === "delete" || key === "backspace") {
+        if (hasSelection) {
+          event.preventDefault();
+          deleteSelected();
+        }
+        return;
+      }
+
+      const modifier = event.metaKey || event.ctrlKey;
+      if (!modifier) return;
+
       if (key === "z") {
         event.preventDefault();
         if (event.shiftKey) redo();
@@ -178,12 +207,35 @@ export function EditorShell({ initialArtworkId = null }: EditorShellProps) {
       } else if (key === "y") {
         event.preventDefault();
         redo();
+      } else if (key === "a") {
+        event.preventDefault();
+        selectAll();
+      } else if (key === "c" && hasSelection) {
+        event.preventDefault();
+        copySelected();
+      } else if (key === "v" && hasClipboard) {
+        event.preventDefault();
+        pasteClipboard();
+      } else if (key === "d" && hasSelection) {
+        event.preventDefault();
+        duplicateSelected();
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [redo, undo]);
+  }, [
+    clearSelection,
+    copySelected,
+    deleteSelected,
+    duplicateSelected,
+    hasClipboard,
+    hasSelection,
+    pasteClipboard,
+    redo,
+    selectAll,
+    undo,
+  ]);
 
   async function saveArtwork() {
     setSaveStatus("saving");
@@ -337,7 +389,7 @@ export function EditorShell({ initialArtworkId = null }: EditorShellProps) {
               <div className={styles.formsPopoverHead}>
                 <div>
                   <strong>Insert form</strong>
-                  <span>Adds a connected structure</span>
+                  <span>Adds and selects a connected structure</span>
                 </div>
                 <button type="button" aria-label="Close forms" onClick={() => setShowForms(false)}>×</button>
               </div>
@@ -353,7 +405,7 @@ export function EditorShell({ initialArtworkId = null }: EditorShellProps) {
           )}
 
           <div className="canvas-hint">
-            <strong>Click</strong> a point for XYZ gizmo · <strong>Forms</strong> inserts ready structures · use View buttons to frame the scene
+            <strong>Shift-click</strong> points for a group · drag the shared XYZ gizmo to move it · <strong>Ctrl/Cmd + D</strong> duplicates
           </div>
           <div className="dimension-badge">3D / XYZ</div>
           {loadStatus === "loading" && <div className="editor-notice">Loading saved artwork…</div>}
@@ -366,6 +418,7 @@ export function EditorShell({ initialArtworkId = null }: EditorShellProps) {
             <p className="eyebrow">Structure</p>
             <div className="stats-row"><span>Points</span><strong>{points.length}</strong></div>
             <div className="stats-row"><span>Connections</span><strong>{edges.length}</strong></div>
+            <div className="stats-row"><span>Selected</span><strong>{selectedIds.length}</strong></div>
             <div className="stats-row"><span>Snap</span><strong>{snapToGrid ? "0.5 on" : "Off"}</strong></div>
             {artworkId && <div className="stats-row"><span>Cloud</span><strong>Saved</strong></div>}
           </div>
@@ -384,16 +437,28 @@ export function EditorShell({ initialArtworkId = null }: EditorShellProps) {
 
           <div className="inspector-section">
             <p className="eyebrow">Selection</p>
-            {selectedIds.length === 0 && <p className="muted">Select one point to reveal its X/Y/Z transform gizmo, or select two points to create a connection.</p>}
-            {selectedIds.length === 2 && (
-              <>
-                <p className="muted">Two points selected.</p>
-                <button className="wide-action" type="button" onClick={connectSelected}>Connect points</button>
-              </>
+
+            {selectedIds.length === 0 && (
+              <p className="muted">
+                Click a point to select it. Shift-click additional points to build a group. Ctrl/Cmd + A selects everything.
+              </p>
             )}
+
+            {selectedIds.length > 1 && (
+              <p className="muted">
+                {selectedIds.length} points selected. The XYZ gizmo now moves the whole group while preserving its shape.
+              </p>
+            )}
+
+            {selectedIds.length === 2 && (
+              <button className="wide-action" type="button" onClick={connectSelected}>
+                Connect selected points
+              </button>
+            )}
+
             {selectedPoint && (
               <>
-                <p className="muted">Use the colored X/Y/Z arrows on the canvas for direct 3D movement, or type exact coordinates below.</p>
+                <p className="muted">Use the XYZ gizmo for direct movement, or type exact coordinates below.</p>
                 <div className="coordinate-panel">
                   {AXES.map(({ label, axis }) => (
                     <label key={label}>
@@ -409,10 +474,56 @@ export function EditorShell({ initialArtworkId = null }: EditorShellProps) {
                 </div>
               </>
             )}
+
+            <div className={styles.selectionActions}>
+              <button
+                type="button"
+                disabled={!hasSelection}
+                onClick={duplicateSelected}
+                title="Duplicate (Ctrl/Cmd + D)"
+              >
+                Duplicate
+              </button>
+              <button
+                type="button"
+                disabled={!hasSelection}
+                onClick={copySelected}
+                title="Copy (Ctrl/Cmd + C)"
+              >
+                Copy
+              </button>
+              <button
+                type="button"
+                disabled={!hasClipboard}
+                onClick={pasteClipboard}
+                title="Paste (Ctrl/Cmd + V)"
+              >
+                Paste
+              </button>
+              <button
+                type="button"
+                disabled={!hasSelection}
+                onClick={clearSelection}
+                title="Clear selection (Esc)"
+              >
+                Clear
+              </button>
+            </div>
+
+            <p className={styles.shortcutHint}>
+              Shift-click multi-select · Esc clear · Delete remove · Ctrl/Cmd C/V/D copy, paste, duplicate
+            </p>
           </div>
 
           <div className="inspector-section inspector-bottom">
-            <button className="danger-action" type="button" disabled={selectedIds.length === 0} onClick={deleteSelected}>Delete selection</button>
+            <button
+              className="danger-action"
+              type="button"
+              disabled={!hasSelection}
+              onClick={deleteSelected}
+            >
+              Delete selection
+            </button>
           </div>
         </aside>
       </section>
