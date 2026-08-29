@@ -1,9 +1,9 @@
 "use client";
 
-import { Grid, Line, OrbitControls } from "@react-three/drei";
+import { Grid, Line, OrbitControls, TransformControls } from "@react-three/drei";
 import { Canvas, ThreeEvent } from "@react-three/fiber";
 import { useMemo, useRef, useState } from "react";
-import { Color, Plane, Vector3 } from "three";
+import { Color, Group, Plane, Vector3 } from "three";
 import { useEditorStore, Vec3Tuple } from "@/lib/editor-store";
 
 const GRID_STEP = 0.5;
@@ -25,14 +25,19 @@ function Scene() {
   const endGesture = useEditorStore((state) => state.endGesture);
 
   const [isDragging, setIsDragging] = useState(false);
+  const [isGizmoDragging, setIsGizmoDragging] = useState(false);
   const dragPointId = useRef<string | null>(null);
   const dragY = useRef(0);
   const dragMoved = useRef(false);
   const suppressClickFor = useRef<string | null>(null);
+  const gizmoTarget = useRef<Group>(null);
   const dragPlane = useMemo(() => new Plane(new Vector3(0, 1, 0), 0), []);
   const dragHit = useMemo(() => new Vector3(), []);
 
   const pointMap = useMemo(() => new Map(points.map((point) => [point.id, point.position])), [points]);
+  const selectedPoint = selectedIds.length === 1
+    ? points.find((point) => point.id === selectedIds[0])
+    : undefined;
 
   const handleFloorClick = (event: ThreeEvent<MouseEvent>) => {
     event.stopPropagation();
@@ -98,7 +103,7 @@ function Scene() {
             position={point.position}
             scale={selected ? 1.35 : 1}
             onPointerDown={(event) => {
-              if (event.button !== 0) return;
+              if (event.button !== 0 || isGizmoDragging) return;
               event.stopPropagation();
 
               beginGesture();
@@ -155,9 +160,40 @@ function Scene() {
         );
       })}
 
+      {selectedPoint && (
+        <TransformControls
+          mode="translate"
+          space="world"
+          size={0.78}
+          translationSnap={snapToGrid ? GRID_STEP : null}
+          onMouseDown={() => {
+            beginGesture();
+            setIsGizmoDragging(true);
+          }}
+          onObjectChange={() => {
+            const target = gizmoTarget.current;
+            if (!target) return;
+
+            const position: Vec3Tuple = [
+              snapCoordinate(target.position.x, snapToGrid),
+              snapCoordinate(target.position.y, snapToGrid),
+              snapCoordinate(target.position.z, snapToGrid),
+            ];
+
+            movePoint(selectedPoint.id, position);
+          }}
+          onMouseUp={() => {
+            setIsGizmoDragging(false);
+            endGesture();
+          }}
+        >
+          <group ref={gizmoTarget} position={selectedPoint.position} />
+        </TransformControls>
+      )}
+
       <OrbitControls
         makeDefault
-        enabled={!isDragging}
+        enabled={!isDragging && !isGizmoDragging}
         enableDamping
         dampingFactor={0.07}
         minDistance={3}
