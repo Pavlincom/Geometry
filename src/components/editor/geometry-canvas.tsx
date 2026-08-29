@@ -1,19 +1,90 @@
 "use client";
 
 import { Grid, Line, OrbitControls, TransformControls } from "@react-three/drei";
-import { Canvas, ThreeEvent } from "@react-three/fiber";
-import { useMemo, useRef, useState } from "react";
+import { Canvas, ThreeEvent, useThree } from "@react-three/fiber";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Color, Group, Plane, Vector3 } from "three";
 import { useEditorStore, Vec3Tuple } from "@/lib/editor-store";
 
 const GRID_STEP = 0.5;
+
+export type CameraPreset = "fit" | "iso" | "top" | "front" | "right";
+export type CameraRequest = { preset: CameraPreset; version: number };
 
 function snapCoordinate(value: number, enabled: boolean) {
   if (enabled) return Math.round(value / GRID_STEP) * GRID_STEP;
   return Math.round(value * 100) / 100;
 }
 
-function Scene() {
+function CameraDirector({ request }: { request: CameraRequest }) {
+  const camera = useThree((state) => state.camera);
+  const controls = useThree((state) => state.controls);
+  const points = useEditorStore((state) => state.points);
+  const pointsRef = useRef(points);
+  pointsRef.current = points;
+
+  useEffect(() => {
+    if (request.version === 0) return;
+
+    const currentPoints = pointsRef.current;
+    let center = new Vector3(0, 1, 0);
+    let span = 4;
+
+    if (currentPoints.length > 0) {
+      let minX = Infinity;
+      let minY = Infinity;
+      let minZ = Infinity;
+      let maxX = -Infinity;
+      let maxY = -Infinity;
+      let maxZ = -Infinity;
+
+      currentPoints.forEach((point) => {
+        minX = Math.min(minX, point.position[0]);
+        minY = Math.min(minY, point.position[1]);
+        minZ = Math.min(minZ, point.position[2]);
+        maxX = Math.max(maxX, point.position[0]);
+        maxY = Math.max(maxY, point.position[1]);
+        maxZ = Math.max(maxZ, point.position[2]);
+      });
+
+      center = new Vector3((minX + maxX) / 2, (minY + maxY) / 2, (minZ + maxZ) / 2);
+      span = Math.max(maxX - minX, maxY - minY, maxZ - minZ, 2);
+    }
+
+    const distance = Math.max(4.8, span * 2.1);
+    let direction: Vector3;
+
+    if (request.preset === "fit") {
+      direction = camera.position.clone().sub(center);
+      if (direction.lengthSq() < 0.001) direction.set(1, 0.8, 1);
+    } else if (request.preset === "top") {
+      direction = new Vector3(0, 1, 0.001);
+    } else if (request.preset === "front") {
+      direction = new Vector3(0, 0, 1);
+    } else if (request.preset === "right") {
+      direction = new Vector3(1, 0, 0);
+    } else {
+      direction = new Vector3(1, 0.8, 1);
+    }
+
+    direction.normalize();
+    camera.up.set(0, 1, 0);
+    if (request.preset === "top") camera.up.set(0, 0, -1);
+    camera.position.copy(center).addScaledVector(direction, distance);
+    camera.lookAt(center);
+
+    const orbit = controls as unknown as {
+      target?: Vector3;
+      update?: () => void;
+    } | null;
+    orbit?.target?.copy(center);
+    orbit?.update?.();
+  }, [camera, controls, request]);
+
+  return null;
+}
+
+function Scene({ cameraRequest }: { cameraRequest: CameraRequest }) {
   const points = useEditorStore((state) => state.points);
   const edges = useEditorStore((state) => state.edges);
   const selectedIds = useEditorStore((state) => state.selectedIds);
@@ -197,16 +268,17 @@ function Scene() {
         enableDamping
         dampingFactor={0.07}
         minDistance={3}
-        maxDistance={24}
+        maxDistance={60}
       />
+      <CameraDirector request={cameraRequest} />
     </>
   );
 }
 
-export function GeometryCanvas() {
+export function GeometryCanvas({ cameraRequest }: { cameraRequest: CameraRequest }) {
   return (
     <Canvas camera={{ position: [6.5, 5.2, 7.2], fov: 45 }} dpr={[1, 2]} gl={{ antialias: true }}>
-      <Scene />
+      <Scene cameraRequest={cameraRequest} />
     </Canvas>
   );
 }
