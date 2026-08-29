@@ -83,7 +83,17 @@ export function EditorShell() {
 
       setSaveStatus("saved");
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Could not save this structure.";
+      let message =
+        error && typeof error === "object" && "message" in error
+          ? String(error.message)
+          : "Could not save this structure.";
+
+      if (message.toLowerCase().includes("anonymous sign-ins")) {
+        message = "Enable Anonymous Sign-Ins in Supabase Auth to save your first structure.";
+      } else if (message.toLowerCase().includes("artworks")) {
+        message = "The Geometry artworks table is not set up in Supabase yet.";
+      }
+
       setSaveError(message);
       setSaveStatus("error");
     }
@@ -99,6 +109,17 @@ export function EditorShell() {
             maxLength={80}
             value={title}
             onChange={(event) => setTitle(event.target.value)}
+            style={{
+              width: 180,
+              border: 0,
+              borderBottom: "1px solid transparent",
+              outline: "none",
+              background: "transparent",
+              color: "#d6d7d9",
+              padding: "4px 6px",
+              textAlign: "center",
+              fontSize: 12,
+            }}
           />
           <span>
             {saveStatus === "saving" && "• Saving"}
@@ -127,7 +148,26 @@ export function EditorShell() {
           <GeometryCanvas />
           <div className="canvas-hint"><strong>Double-click</strong> the grid to add a point · drag to orbit · scroll to zoom</div>
           <div className="dimension-badge">3D / XYZ</div>
-          {saveStatus === "error" && <div className="save-error">{saveError}</div>}
+          {saveStatus === "error" && (
+            <div
+              role="status"
+              style={{
+                position: "absolute",
+                top: 16,
+                right: 16,
+                maxWidth: 330,
+                border: "1px solid rgba(255,255,255,.12)",
+                borderRadius: 9,
+                background: "rgba(112, 42, 31, .94)",
+                color: "#fff",
+                padding: "10px 12px",
+                fontSize: 11,
+                lineHeight: 1.45,
+              }}
+            >
+              {saveError}
+            </div>
+          )}
         </div>
 
         <aside className="inspector">
