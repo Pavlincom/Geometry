@@ -1,0 +1,462 @@
+.atlas {
+  border-top: 1px solid rgba(16, 17, 19, 0.14);
+}
+
+.atlasSection {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.72fr) minmax(0, 1.65fr);
+  border-bottom: 1px solid rgba(16, 17, 19, 0.14);
+  outline: none;
+  scroll-margin-top: 78px;
+}
+
+.atlasSection:focus-visible {
+  box-shadow: inset 0 0 0 2px rgba(255, 104, 70, 0.55);
+}
+
+.chapterCopy {
+  padding: 58px clamp(28px, 4vw, 64px) 52px 6vw;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.chapterIndex {
+  color: #8a877f;
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  margin-bottom: 34px;
+}
+
+.eyebrow {
+  margin: 0 0 13px;
+  color: #7a776f;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.chapterCopy h2 {
+  max-width: 420px;
+  margin: 0;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(42px, 4.8vw, 72px);
+  font-weight: 400;
+  letter-spacing: -0.055em;
+  line-height: 0.96;
+}
+
+.chapterCopy h2 span {
+  color: #e85f3d;
+}
+
+.chapterIntro {
+  max-width: 470px;
+  margin: 27px 0 0;
+  color: #55534d;
+  font-size: 15px;
+  line-height: 1.68;
+}
+
+.tagRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 27px;
+}
+
+.tagRow span {
+  border: 1px solid rgba(16, 17, 19, 0.12);
+  border-radius: 999px;
+  color: #6f6c65;
+  padding: 7px 10px;
+  font-size: 9px;
+  letter-spacing: 0.02em;
+}
+
+.studioLink {
+  margin-top: auto;
+  padding-top: 42px;
+  color: #d95434;
+  border-bottom: 1px solid rgba(217, 84, 52, 0.5);
+  font-size: 11px;
+  font-weight: 700;
+  padding-bottom: 4px;
+}
+
+.viewer {
+  min-width: 0;
+  border-left: 1px solid rgba(16, 17, 19, 0.14);
+  background: #f8f5ee;
+}
+
+.mediaShell {
+  position: relative;
+  overflow: hidden;
+  background: #171714;
+}
+
+.mediaFigure {
+  position: relative;
+  margin: 0;
+  aspect-ratio: 16 / 8.9;
+  overflow: hidden;
+  transform-origin: center;
+}
+
+.mediaFigure img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scale(1.015);
+}
+
+.enterNext {
+  animation: atlas-enter-next 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.enterPrevious {
+  animation: atlas-enter-previous 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.geometryOverlay {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 420ms ease;
+  mix-blend-mode: screen;
+}
+
+.geometryOverlay svg {
+  width: 100%;
+  height: 100%;
+  fill: none;
+  stroke: rgba(255, 244, 223, 0.78);
+  stroke-width: 1.25;
+  stroke-dasharray: 4 5;
+}
+
+.geometryOverlay svg circle:last-child {
+  fill: #eb6543;
+  stroke: #fff1df;
+  stroke-dasharray: none;
+}
+
+.overlayVisible {
+  opacity: 0.82;
+}
+
+.arrowButton {
+  position: absolute;
+  top: 50%;
+  z-index: 3;
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  transform: translateY(-50%);
+  border: 1px solid rgba(255,255,255,.34);
+  border-radius: 50%;
+  background: rgba(12, 12, 10, 0.48);
+  backdrop-filter: blur(10px);
+  color: #fff;
+  font-size: 20px;
+  transition: background 180ms ease, transform 180ms ease, border-color 180ms ease;
+}
+
+.arrowPrevious {
+  left: 18px;
+}
+
+.arrowNext {
+  right: 18px;
+  background: rgba(226, 91, 57, 0.9);
+  border-color: rgba(255,255,255,.56);
+}
+
+.arrowButton:hover {
+  background: rgba(18, 18, 16, 0.76);
+  border-color: rgba(255,255,255,.7);
+}
+
+.arrowNext:hover {
+  background: #d95736;
+}
+
+.arrowButton:active {
+  transform: translateY(-50%) scale(0.94);
+}
+
+.photoCounter {
+  position: absolute;
+  z-index: 3;
+  right: 22px;
+  bottom: 18px;
+  padding: 7px 9px;
+  border: 1px solid rgba(255,255,255,.2);
+  border-radius: 999px;
+  background: rgba(10,10,9,.45);
+  color: rgba(255,255,255,.86);
+  backdrop-filter: blur(10px);
+  font-size: 9px;
+  letter-spacing: 0.13em;
+}
+
+.viewerFooter {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(210px, 0.55fr);
+  min-height: 250px;
+}
+
+.slideCopy {
+  padding: 30px clamp(26px, 3vw, 46px) 32px;
+  border-right: 1px solid rgba(16, 17, 19, 0.12);
+  animation: atlas-copy-in 430ms ease both;
+}
+
+.slideCopy > p:first-child {
+  margin: 0 0 7px;
+  color: #d95434;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.slideCopy h3 {
+  margin: 0;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(26px, 2.4vw, 38px);
+  font-weight: 400;
+  letter-spacing: -0.035em;
+}
+
+.description {
+  max-width: 680px;
+  margin: 13px 0 0;
+  color: #55534d;
+  font-size: 13px;
+  line-height: 1.62;
+}
+
+.focusLine {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr);
+  gap: 14px;
+  max-width: 720px;
+  margin-top: 19px;
+  padding-top: 15px;
+  border-top: 1px solid rgba(16,17,19,.1);
+}
+
+.focusLine span {
+  color: #8c8981;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: .09em;
+}
+
+.focusLine strong {
+  color: #363632;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.slideCopy > a {
+  display: inline-block;
+  margin-top: 17px;
+  color: #858179;
+  font-size: 9px;
+  border-bottom: 1px solid rgba(16,17,19,.18);
+  padding-bottom: 3px;
+}
+
+.viewerControls {
+  padding: 28px 24px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.overlayToggle {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  border: 0;
+  background: transparent;
+  color: #66635d;
+  padding: 6px 0;
+  font-size: 10px;
+}
+
+.overlayToggle > span {
+  position: relative;
+  width: 31px;
+  height: 18px;
+  border: 1px solid rgba(16,17,19,.2);
+  border-radius: 999px;
+  background: rgba(16,17,19,.08);
+  transition: background 220ms ease, border-color 220ms ease;
+}
+
+.overlayToggle > span::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0,0,0,.15);
+  transition: transform 240ms cubic-bezier(.2,.8,.2,1);
+}
+
+.overlayToggleActive > span {
+  background: #df5c3a;
+  border-color: #df5c3a;
+}
+
+.overlayToggleActive > span::after {
+  transform: translateX(13px);
+}
+
+.dots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 24px;
+}
+
+.dots button {
+  width: 9px;
+  height: 9px;
+  border: 1px solid #9f9b93;
+  border-radius: 50%;
+  background: transparent;
+  padding: 0;
+  transition: transform 180ms ease, background 180ms ease, border-color 180ms ease;
+}
+
+.dots button:hover {
+  transform: scale(1.25);
+}
+
+.dots .dotActive {
+  background: #de5a38;
+  border-color: #de5a38;
+  transform: scale(1.2);
+}
+
+.progressTrack {
+  width: 100%;
+  height: 2px;
+  margin-top: auto;
+  background: rgba(16,17,19,.1);
+  overflow: hidden;
+}
+
+.progressTrack span {
+  display: block;
+  height: 100%;
+  background: #d95434;
+  transition: width 460ms cubic-bezier(.22,1,.36,1);
+}
+
+.keyboardHint {
+  margin: 9px 0 0;
+  color: #9b978f;
+  font-size: 8px;
+}
+
+@keyframes atlas-enter-next {
+  from { opacity: 0; transform: translateX(18px) scale(1.015); }
+  to { opacity: 1; transform: translateX(0) scale(1); }
+}
+
+@keyframes atlas-enter-previous {
+  from { opacity: 0; transform: translateX(-18px) scale(1.015); }
+  to { opacity: 1; transform: translateX(0) scale(1); }
+}
+
+@keyframes atlas-copy-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 980px) {
+  .atlasSection {
+    grid-template-columns: 1fr;
+  }
+
+  .chapterCopy {
+    padding: 46px 6vw 38px;
+  }
+
+  .studioLink {
+    margin-top: 0;
+    padding-top: 28px;
+  }
+
+  .viewer {
+    border-left: 0;
+    border-top: 1px solid rgba(16,17,19,.14);
+  }
+}
+
+@media (max-width: 680px) {
+  .chapterCopy h2 {
+    font-size: 46px;
+  }
+
+  .mediaFigure {
+    aspect-ratio: 4 / 3;
+  }
+
+  .arrowButton {
+    width: 44px;
+    height: 44px;
+  }
+
+  .viewerFooter {
+    grid-template-columns: 1fr;
+  }
+
+  .slideCopy {
+    border-right: 0;
+    border-bottom: 1px solid rgba(16,17,19,.12);
+  }
+
+  .viewerControls {
+    min-height: 150px;
+  }
+
+  .focusLine {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .enterNext,
+  .enterPrevious,
+  .slideCopy {
+    animation: none;
+  }
+
+  .geometryOverlay,
+  .progressTrack span,
+  .overlayToggle > span,
+  .overlayToggle > span::after,
+  .dots button,
+  .arrowButton {
+    transition: none;
+  }
+}
