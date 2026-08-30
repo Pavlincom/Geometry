@@ -1,0 +1,369 @@
+.browser {
+  border-top: 1px solid rgba(16, 17, 19, 0.14);
+  border-bottom: 1px solid rgba(16, 17, 19, 0.14);
+  background: #f4f1e9;
+}
+
+.entry {
+  width: 100%;
+  min-height: 164px;
+  padding: 34px 6vw;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  border: 0;
+  background: transparent;
+  color: #101113;
+  text-align: left;
+  transition: background 240ms ease;
+}
+
+.entry:hover,
+.entryOpen {
+  background: #eee9de;
+}
+
+.entry > span:first-child {
+  display: grid;
+  gap: 8px;
+}
+
+.entry small,
+.patternMeta small,
+.photoPanel small {
+  color: #8a877f;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.entry strong {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(38px, 5vw, 72px);
+  font-weight: 400;
+  letter-spacing: -0.055em;
+  line-height: 0.95;
+}
+
+.entryArrow {
+  width: 58px;
+  height: 58px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(16, 17, 19, 0.18);
+  border-radius: 50%;
+  font-size: 20px;
+  transition: transform 280ms cubic-bezier(.22,1,.36,1), background 180ms ease;
+}
+
+.entry:hover .entryArrow {
+  transform: rotate(-4deg) scale(1.04);
+  background: #fffaf0;
+}
+
+.reveal {
+  border-top: 1px solid rgba(16, 17, 19, 0.12);
+  animation: reveal-in 380ms cubic-bezier(.22,1,.36,1) both;
+}
+
+.categoryChooser {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.categoryChooser > button {
+  min-height: 250px;
+  padding: 36px clamp(24px, 3vw, 46px);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  border: 0;
+  border-right: 1px solid rgba(16, 17, 19, 0.12);
+  background: #f8f5ee;
+  color: #111214;
+  text-align: left;
+  transition: background 220ms ease, padding 280ms cubic-bezier(.22,1,.36,1);
+}
+
+.categoryChooser > button:last-child { border-right: 0; }
+.categoryChooser > button:hover { background: #fffaf0; padding-left: calc(clamp(24px, 3vw, 46px) + 6px); }
+
+.categoryChooser span {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(28px, 3vw, 44px);
+  letter-spacing: -0.045em;
+}
+
+.categoryChooser p {
+  max-width: 340px;
+  margin: 18px 0 0;
+  color: #69665f;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.categoryChooser b {
+  margin-top: auto;
+  color: #dc5a39;
+  font-size: 20px;
+  font-weight: 400;
+}
+
+.experience {
+  outline: none;
+  background: #f8f5ee;
+}
+
+.experience:focus-visible {
+  box-shadow: inset 0 0 0 2px rgba(220, 90, 57, .45);
+}
+
+.experienceHead {
+  min-height: 66px;
+  padding: 0 6vw;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 26px;
+  border-bottom: 1px solid rgba(16, 17, 19, 0.12);
+}
+
+.experienceHead > button,
+.categoryTabs button {
+  border: 0;
+  background: transparent;
+  color: #77746d;
+  padding: 8px 0;
+  font-size: 10px;
+}
+
+.experienceHead > button:hover,
+.categoryTabs button:hover { color: #111214; }
+
+.categoryTabs {
+  display: flex;
+  justify-content: center;
+  gap: 22px;
+}
+
+.categoryTabs .activeTab {
+  color: #111214;
+  border-bottom: 1px solid #dc5a39;
+}
+
+.experienceHead > span {
+  color: #8b887f;
+  font-size: 9px;
+  letter-spacing: .13em;
+}
+
+.pair {
+  display: grid;
+  grid-template-columns: minmax(300px, .72fr) minmax(0, 1.28fr);
+  min-height: 610px;
+}
+
+.moveNext { animation: pair-next 480ms cubic-bezier(.22,1,.36,1) both; }
+.movePrevious { animation: pair-previous 480ms cubic-bezier(.22,1,.36,1) both; }
+
+.patternPanel {
+  min-width: 0;
+  padding: 46px clamp(26px, 4vw, 62px) 40px 6vw;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid rgba(16, 17, 19, 0.12);
+  background: #f0ece2;
+}
+
+.patternMeta h2,
+.photoPanel h2 {
+  margin: 7px 0 0;
+  font-family: Georgia, "Times New Roman", serif;
+  font-weight: 400;
+  letter-spacing: -0.045em;
+  line-height: 1;
+}
+
+.patternMeta h2 { font-size: clamp(32px, 3.5vw, 54px); }
+.photoPanel h2 { font-size: clamp(25px, 2.6vw, 38px); color: #fff; }
+
+.patternCanvas {
+  flex: 1;
+  min-height: 300px;
+  display: grid;
+  place-items: center;
+}
+
+.patternCanvas svg {
+  width: min(100%, 520px);
+  height: auto;
+  overflow: visible;
+  fill: none;
+  stroke: #242522;
+  stroke-width: 1.25;
+  vector-effect: non-scaling-stroke;
+}
+
+.patternCanvas svg circle:not(:first-child) {
+  stroke: #242522;
+}
+
+.patternPanel > p {
+  max-width: 470px;
+  margin: 0;
+  padding-top: 20px;
+  border-top: 1px solid rgba(16, 17, 19, .12);
+  color: #615f58;
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+.photoPanel {
+  min-width: 0;
+  min-height: 610px;
+  position: relative;
+  margin: 0;
+  overflow: hidden;
+  background: #171714;
+}
+
+.photoPanel img {
+  width: 100%;
+  height: 100%;
+  min-height: 610px;
+  display: block;
+  object-fit: cover;
+  transform: scale(1.01);
+  animation: image-settle 700ms cubic-bezier(.22,1,.36,1) both;
+}
+
+.photoPanel::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0;
+  height: 42%;
+  pointer-events: none;
+  background: linear-gradient(to top, rgba(8,8,7,.72), transparent);
+}
+
+.photoPanel figcaption {
+  position: absolute;
+  z-index: 2;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 34px clamp(24px, 3vw, 44px);
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.photoPanel small { color: rgba(255,255,255,.62); }
+.photoPanel a {
+  color: rgba(255,255,255,.8);
+  font-size: 9px;
+  border-bottom: 1px solid rgba(255,255,255,.32);
+  padding-bottom: 3px;
+}
+
+.navigation {
+  min-height: 72px;
+  padding: 0 6vw;
+  display: grid;
+  grid-template-columns: 48px 1fr 48px;
+  align-items: center;
+  gap: 22px;
+  border-top: 1px solid rgba(16, 17, 19, 0.12);
+}
+
+.navigation > button {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(16,17,19,.17);
+  border-radius: 50%;
+  background: transparent;
+  color: #111214;
+  transition: transform 180ms ease, background 180ms ease;
+}
+
+.navigation > button:hover { transform: scale(1.05); background: #fffaf0; }
+.navigation .nextButton { background: #151615; color: #fff; border-color: #151615; }
+
+.dots {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.dots button {
+  width: 7px;
+  height: 7px;
+  padding: 0;
+  border: 1px solid #9d9990;
+  border-radius: 50%;
+  background: transparent;
+  transition: transform 160ms ease, background 160ms ease;
+}
+
+.dots .activeDot {
+  background: #dc5a39;
+  border-color: #dc5a39;
+  transform: scale(1.35);
+}
+
+@keyframes reveal-in {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pair-next {
+  from { opacity: .18; transform: translateX(18px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes pair-previous {
+  from { opacity: .18; transform: translateX(-18px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes image-settle {
+  from { transform: scale(1.035); filter: saturate(.86); }
+  to { transform: scale(1.01); filter: saturate(1); }
+}
+
+@media (max-width: 900px) {
+  .categoryChooser { grid-template-columns: 1fr; }
+  .categoryChooser > button { min-height: 170px; border-right: 0; border-bottom: 1px solid rgba(16,17,19,.12); }
+  .categoryChooser > button:last-child { border-bottom: 0; }
+  .experienceHead { grid-template-columns: 1fr auto; padding: 14px 20px; }
+  .categoryTabs { grid-column: 1 / -1; grid-row: 2; justify-content: flex-start; overflow-x: auto; }
+  .pair { grid-template-columns: 1fr; min-height: 0; }
+  .patternPanel { min-height: 440px; border-right: 0; border-bottom: 1px solid rgba(16,17,19,.12); padding: 34px 20px 28px; }
+  .patternCanvas { min-height: 245px; }
+  .photoPanel, .photoPanel img { min-height: 420px; }
+  .navigation { padding: 0 20px; }
+}
+
+@media (max-width: 620px) {
+  .entry { min-height: 130px; padding: 26px 18px; }
+  .entryArrow { width: 48px; height: 48px; }
+  .experienceHead { gap: 12px; }
+  .categoryTabs { gap: 16px; }
+  .photoPanel, .photoPanel img { min-height: 360px; }
+  .photoPanel figcaption { padding: 24px 20px; }
+  .navigation { gap: 12px; }
+  .dots { gap: 6px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal, .moveNext, .movePrevious, .photoPanel img { animation: none; }
+  .entryArrow, .categoryChooser > button, .navigation > button, .dots button { transition: none; }
+}
