@@ -158,7 +158,13 @@
 .experienceHead > span {
   color: #8b887f;
   font-size: 9px;
-  letter-spacing: .13em;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+}
+
+.viewerStage {
+  position: relative;
+  overflow: hidden;
 }
 
 .pair {
@@ -170,6 +176,55 @@
 .moveNext { animation: pair-next 480ms cubic-bezier(.22,1,.36,1) both; }
 .movePrevious { animation: pair-previous 480ms cubic-bezier(.22,1,.36,1) both; }
 
+.sideArrow {
+  position: absolute;
+  z-index: 6;
+  top: 50%;
+  min-width: 88px;
+  height: 44px;
+  padding: 0 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transform: translateY(-50%);
+  border: 1px solid rgba(16,17,19,.2);
+  border-radius: 999px;
+  background: rgba(250,247,239,.92);
+  color: #151614;
+  box-shadow: 0 8px 28px rgba(0,0,0,.1);
+  backdrop-filter: blur(12px);
+  transition: transform 180ms ease, background 180ms ease, box-shadow 180ms ease;
+}
+
+.sideArrow:hover {
+  transform: translateY(-50%) scale(1.04);
+  background: #fffaf0;
+  box-shadow: 0 10px 32px rgba(0,0,0,.15);
+}
+
+.sideArrow span {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.sideArrow small {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.sideArrowLeft { left: 16px; }
+.sideArrowRight {
+  right: 16px;
+  border-color: rgba(255,255,255,.35);
+  background: rgba(20,21,19,.84);
+  color: #fff;
+}
+
+.sideArrowRight:hover { background: #dc5a39; }
+
 .patternPanel {
   min-width: 0;
   padding: 46px clamp(26px, 4vw, 62px) 40px 6vw;
@@ -177,6 +232,13 @@
   flex-direction: column;
   border-right: 1px solid rgba(16, 17, 19, 0.12);
   background: #f0ece2;
+}
+
+.patternMeta {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
 }
 
 .patternMeta h2,
@@ -190,6 +252,32 @@
 
 .patternMeta h2 { font-size: clamp(32px, 3.5vw, 54px); }
 .photoPanel h2 { font-size: clamp(25px, 2.6vw, 38px); color: #fff; }
+
+.levelBadge {
+  flex: 0 0 auto;
+  margin-top: 2px;
+  padding: 7px 9px;
+  border: 1px solid rgba(16,17,19,.14);
+  border-radius: 999px;
+  color: #69665f;
+  background: rgba(255,255,255,.38);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.levelIntermediate {
+  border-color: rgba(202,112,72,.3);
+  color: #a65338;
+  background: rgba(220,90,57,.07);
+}
+
+.levelAdvanced {
+  border-color: #252622;
+  color: #f7f3e9;
+  background: #252622;
+}
 
 .patternCanvas {
   flex: 1;
@@ -208,7 +296,8 @@
   vector-effect: non-scaling-stroke;
 }
 
-.patternCanvas svg circle:not(:first-child) {
+.patternCanvas svg circle:not(:first-child),
+.patternCanvas svg rect {
   stroke: #242522;
 }
 
@@ -237,6 +326,7 @@
   min-height: 610px;
   display: block;
   object-fit: cover;
+  object-position: center;
   transform: scale(1.01);
   animation: image-settle 700ms cubic-bezier(.22,1,.36,1) both;
 }
@@ -300,23 +390,26 @@
   display: flex;
   justify-content: center;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 9px;
 }
 
 .dots button {
-  width: 7px;
-  height: 7px;
+  width: 8px;
+  height: 8px;
   padding: 0;
   border: 1px solid #9d9990;
   border-radius: 50%;
   background: transparent;
-  transition: transform 160ms ease, background 160ms ease;
+  transition: transform 160ms ease, background 160ms ease, border-color 160ms ease;
 }
+
+.dots .dotIntermediate { border-color: #c47b5b; }
+.dots .dotAdvanced { border-color: #42433e; }
 
 .dots .activeDot {
   background: #dc5a39;
   border-color: #dc5a39;
-  transform: scale(1.35);
+  transform: scale(1.4);
 }
 
 @keyframes reveal-in {
@@ -350,6 +443,7 @@
   .patternCanvas { min-height: 245px; }
   .photoPanel, .photoPanel img { min-height: 420px; }
   .navigation { padding: 0 20px; }
+  .sideArrow { top: calc(50% + 205px); }
 }
 
 @media (max-width: 620px) {
@@ -361,9 +455,20 @@
   .photoPanel figcaption { padding: 24px 20px; }
   .navigation { gap: 12px; }
   .dots { gap: 6px; }
+  .sideArrow {
+    top: calc(50% + 180px);
+    min-width: 46px;
+    width: 46px;
+    height: 46px;
+    padding: 0;
+  }
+  .sideArrow small { display: none; }
+  .sideArrowLeft { left: 10px; }
+  .sideArrowRight { right: 10px; }
+  .patternMeta { align-items: flex-start; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .reveal, .moveNext, .movePrevious, .photoPanel img { animation: none; }
-  .entryArrow, .categoryChooser > button, .navigation > button, .dots button { transition: none; }
+  .entryArrow, .categoryChooser > button, .navigation > button, .dots button, .sideArrow { transition: none; }
 }
