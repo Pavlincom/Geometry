@@ -1,0 +1,135 @@
+.panel {
+  position: fixed;
+  right: 304px;
+  bottom: 18px;
+  z-index: 12;
+  width: min(276px, calc(100vw - 36px));
+  padding: 13px;
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: 11px;
+  background: rgba(13, 14, 17, 0.9);
+  color: #f2f2ef;
+  box-shadow: 0 14px 38px rgba(0, 0, 0, 0.22);
+  backdrop-filter: blur(14px);
+  pointer-events: none;
+}
+
+.heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 11px;
+  color: #7f828a;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.heading strong {
+  color: #aeb1b8;
+  font-size: 9px;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+}
+
+.empty,
+.angleHint {
+  margin: 0;
+  color: #777b84;
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.primaryMeasure {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 12px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.primaryMeasure > span {
+  color: #92959c;
+  font-size: 10px;
+}
+
+.primaryMeasure > strong {
+  color: #fff;
+  font-size: 23px;
+  line-height: 1;
+  letter-spacing: -0.035em;
+  font-weight: 600;
+}
+
+.primaryMeasure small {
+  color: #777b84;
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.detailGrid,
+.detailGridTwo {
+  display: grid;
+  gap: 5px;
+  margin-top: 10px;
+}
+
+.detailGrid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.detailGridTwo {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.detailGrid div,
+.detailGridTwo div {
+  min-width: 0;
+  padding: 7px 8px;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.045);
+  display: grid;
+  gap: 4px;
+}
+
+.detailGrid span,
+.detailGridTwo span {
+  color: #686b72;
+  font-size: 8px;
+  letter-spacing: 0.08em;
+}
+
+.detailGrid strong,
+.detailGridTwo strong {
+  overflow: hidden;
+  color: #cfd1d5;
+  font-size: 10px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+}
+
+.angleHint {
+  margin-top: 9px;
+}
+
+@media (max-width: 900px) {
+  .panel {
+    right: 18px;
+    bottom: 18px;
+  }
+}
+
+@media (max-width: 680px) {
+  .panel {
+    right: 12px;
+    bottom: 12px;
+    width: min(250px, calc(100vw - 82px));
+  }
+
+  .primaryMeasure > strong {
+    font-size: 20px;
+  }
+}
