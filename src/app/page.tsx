@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { SiteFooter, SiteHeader } from "@/components/site/site-header";
-import styles from "./site-pages.module.css";
+import styles from "./home.module.css";
 
 const routes = [
   {
