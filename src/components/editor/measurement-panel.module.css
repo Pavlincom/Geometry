@@ -1,17 +1,25 @@
 .panel {
+  color: #f2f2ef;
+}
+
+.floating {
   position: fixed;
-  right: 304px;
+  right: 18px;
   bottom: 18px;
   z-index: 12;
+  display: none;
   width: min(276px, calc(100vw - 36px));
   padding: 13px;
   border: 1px solid rgba(255, 255, 255, 0.11);
   border-radius: 11px;
   background: rgba(13, 14, 17, 0.9);
-  color: #f2f2ef;
   box-shadow: 0 14px 38px rgba(0, 0, 0, 0.22);
   backdrop-filter: blur(14px);
   pointer-events: none;
+}
+
+.embedded {
+  width: 100%;
 }
 
 .heading {
@@ -49,6 +57,11 @@
   padding: 12px 0;
   border-top: 1px solid rgba(255, 255, 255, 0.07);
   border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.embedded .primaryMeasure {
+  border-top: 0;
+  padding-top: 2px;
 }
 
 .primaryMeasure > span {
@@ -116,14 +129,15 @@
 }
 
 @media (max-width: 900px) {
-  .panel {
+  .floating {
+    display: block;
     right: 18px;
     bottom: 18px;
   }
 }
 
 @media (max-width: 680px) {
-  .panel {
+  .floating {
     right: 12px;
     bottom: 12px;
     width: min(250px, calc(100vw - 82px));
