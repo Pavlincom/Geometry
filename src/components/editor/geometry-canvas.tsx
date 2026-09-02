@@ -3,7 +3,8 @@
 import { Grid, Line, OrbitControls, TransformControls } from "@react-three/drei";
 import { Canvas, ThreeEvent, useThree } from "@react-three/fiber";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Color, Group, Plane, Vector3 } from "three";
+import type { PointerEvent as ReactPointerEvent } from "react";
+import { Camera, Color, Group, Plane, Vector3 } from "three";
 import { useEditorStore, Vec3Tuple } from "@/lib/editor-store";
 import styles from "./editor-controls.module.css";
 
@@ -12,6 +13,14 @@ const GRID_STEP = 0.5;
 export type CameraPreset = "fit" | "iso" | "top" | "front" | "right";
 export type CameraRequest = { preset: CameraPreset; version: number };
 export type TransformMode = "translate" | "rotate" | "scale";
+
+type SelectionBox = {
+  startX: number;
+  startY: number;
+  currentX: number;
+  currentY: number;
+  additive: boolean;
+};
 
 const TRANSFORM_MODES: Array<{ mode: TransformMode; label: string; key: string }> = [
   { mode: "translate", label: "Move", key: "W" },
@@ -22,6 +31,19 @@ const TRANSFORM_MODES: Array<{ mode: TransformMode; label: string; key: string }
 function snapCoordinate(value: number, enabled: boolean) {
   if (enabled) return Math.round(value / GRID_STEP) * GRID_STEP;
   return Math.round(value * 100) / 100;
+}
+
+function CameraBridge({ cameraRef }: { cameraRef: { current: Camera | null } }) {
+  const camera = useThree((state) => state.camera);
+
+  useEffect(() => {
+    cameraRef.current = camera;
+    return () => {
+      cameraRef.current = null;
+    };
+  }, [camera, cameraRef]);
+
+  return null;
 }
 
 function CameraDirector({ request }: { request: CameraRequest }) {
@@ -95,9 +117,13 @@ function CameraDirector({ request }: { request: CameraRequest }) {
 function Scene({
   cameraRequest,
   transformMode,
+  boxSelectEnabled,
+  cameraRef,
 }: {
   cameraRequest: CameraRequest;
   transformMode: TransformMode;
+  boxSelectEnabled: boolean;
+  cameraRef: { current: Camera | null };
 }) {
   const points = useEditorStore((state) => state.points);
   const edges = useEditorStore((state) => state.edges);
@@ -390,7 +416,7 @@ function Scene({
         );
       })}
 
-      {selectionCenter && (
+      {selectionCenter && !boxSelectEnabled && (
         <TransformControls
           mode={transformMode}
           space="world"
@@ -432,26 +458,39 @@ function Scene({
 
       <OrbitControls
         makeDefault
-        enabled={!isDragging && !isGizmoDragging}
+        enabled={!isDragging && !isGizmoDragging && !boxSelectEnabled}
         enableDamping
         dampingFactor={0.07}
         minDistance={3}
         maxDistance={60}
       />
+      <CameraBridge cameraRef={cameraRef} />
       <CameraDirector request={cameraRequest} />
     </>
   );
 }
 
 export function GeometryCanvas({ cameraRequest }: { cameraRequest: CameraRequest }) {
-  const selectedCount = useEditorStore((state) => state.selectedIds.length);
+  const points = useEditorStore((state) => state.points);
+  const selectedIds = useEditorStore((state) => state.selectedIds);
+  const selectPoint = useEditorStore((state) => state.selectPoint);
+  const clearSelection = useEditorStore((state) => state.clearSelection);
+  const selectedCount = selectedIds.length;
+
+  const cameraRef = useRef<Camera | null>(null);
   const [transformMode, setTransformMode] = useState<TransformMode>("translate");
+  const [boxSelectEnabled, setBoxSelectEnabled] = useState(false);
+  const [selectionBox, setSelectionBox] = useState<SelectionBox | null>(null);
 
   useEffect(() => {
     if (selectedCount < 2 && transformMode !== "translate") {
       setTransformMode("translate");
     }
   }, [selectedCount, transformMode]);
+
+  useEffect(() => {
+    if (!boxSelectEnabled) setSelectionBox(null);
+  }, [boxSelectEnabled]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -463,18 +502,104 @@ export function GeometryCanvas({ cameraRequest }: { cameraRequest: CameraRequest
       if (isTyping || event.metaKey || event.ctrlKey || event.altKey) return;
 
       const key = event.key.toLowerCase();
-      if (key === "w") setTransformMode("translate");
-      if (key === "e" && selectedCount > 1) setTransformMode("rotate");
-      if (key === "r" && selectedCount > 1) setTransformMode("scale");
+      if (key === "b") {
+        setBoxSelectEnabled((current) => !current);
+        return;
+      }
+      if (key === "w") {
+        setBoxSelectEnabled(false);
+        setTransformMode("translate");
+      }
+      if (key === "e" && selectedCount > 1) {
+        setBoxSelectEnabled(false);
+        setTransformMode("rotate");
+      }
+      if (key === "r" && selectedCount > 1) {
+        setBoxSelectEnabled(false);
+        setTransformMode("scale");
+      }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [selectedCount]);
 
+  function pointerPosition(event: ReactPointerEvent<HTMLDivElement>) {
+    const bounds = event.currentTarget.getBoundingClientRect();
+    return {
+      x: event.clientX - bounds.left,
+      y: event.clientY - bounds.top,
+      bounds,
+    };
+  }
+
+  function beginBoxSelection(event: ReactPointerEvent<HTMLDivElement>) {
+    if (event.button !== 0) return;
+    const { x, y } = pointerPosition(event);
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setSelectionBox({
+      startX: x,
+      startY: y,
+      currentX: x,
+      currentY: y,
+      additive: event.shiftKey || event.ctrlKey || event.metaKey,
+    });
+  }
+
+  function moveBoxSelection(event: ReactPointerEvent<HTMLDivElement>) {
+    if (!selectionBox) return;
+    const { x, y } = pointerPosition(event);
+    setSelectionBox((current) => current ? { ...current, currentX: x, currentY: y } : null);
+  }
+
+  function finishBoxSelection(event: ReactPointerEvent<HTMLDivElement>) {
+    if (!selectionBox) return;
+
+    const { x, y, bounds } = pointerPosition(event);
+    const completed = { ...selectionBox, currentX: x, currentY: y };
+    const camera = cameraRef.current;
+
+    if (camera) {
+      camera.updateMatrixWorld();
+      const minX = Math.min(completed.startX, completed.currentX);
+      const maxX = Math.max(completed.startX, completed.currentX);
+      const minY = Math.min(completed.startY, completed.currentY);
+      const maxY = Math.max(completed.startY, completed.currentY);
+
+      const ids = points.flatMap((point) => {
+        const projected = new Vector3(...point.position).project(camera);
+        if (projected.z < -1 || projected.z > 1) return [];
+
+        const screenX = ((projected.x + 1) / 2) * bounds.width;
+        const screenY = ((1 - projected.y) / 2) * bounds.height;
+        const inside = screenX >= minX && screenX <= maxX && screenY >= minY && screenY <= maxY;
+        return inside ? [point.id] : [];
+      });
+
+      if (!completed.additive) clearSelection();
+      ids.forEach((id) => {
+        if (!completed.additive || !selectedIds.includes(id)) selectPoint(id, true);
+      });
+    }
+
+    setSelectionBox(null);
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+  }
+
+  const marqueeStyle = selectionBox
+    ? {
+        left: Math.min(selectionBox.startX, selectionBox.currentX),
+        top: Math.min(selectionBox.startY, selectionBox.currentY),
+        width: Math.abs(selectionBox.currentX - selectionBox.startX),
+        height: Math.abs(selectionBox.currentY - selectionBox.startY),
+      }
+    : undefined;
+
   return (
     <>
-      <div className={styles.transformToolbar} aria-label="Transform mode">
+      <div className={styles.transformToolbar} aria-label="Studio mode">
         {TRANSFORM_MODES.map((item) => {
           const groupOnly = item.mode !== "translate";
           const disabled = groupOnly && selectedCount < 2;
@@ -482,15 +607,27 @@ export function GeometryCanvas({ cameraRequest }: { cameraRequest: CameraRequest
             <button
               key={item.mode}
               type="button"
-              className={transformMode === item.mode ? styles.activeTransform : ""}
+              className={!boxSelectEnabled && transformMode === item.mode ? styles.activeTransform : ""}
               disabled={disabled}
-              onClick={() => setTransformMode(item.mode)}
+              onClick={() => {
+                setBoxSelectEnabled(false);
+                setTransformMode(item.mode);
+              }}
               title={`${item.label} (${item.key})${groupOnly ? " · select 2+ points" : ""}`}
             >
               <span>{item.key}</span>{item.label}
             </button>
           );
         })}
+        <button
+          type="button"
+          className={boxSelectEnabled ? styles.activeTransform : ""}
+          aria-pressed={boxSelectEnabled}
+          onClick={() => setBoxSelectEnabled((current) => !current)}
+          title="Box select (B) · Shift-drag adds to the current selection"
+        >
+          <span>B</span>Box
+        </button>
       </div>
 
       <Canvas
@@ -498,8 +635,26 @@ export function GeometryCanvas({ cameraRequest }: { cameraRequest: CameraRequest
         dpr={[1, 2]}
         gl={{ antialias: true }}
       >
-        <Scene cameraRequest={cameraRequest} transformMode={transformMode} />
+        <Scene
+          cameraRequest={cameraRequest}
+          transformMode={transformMode}
+          boxSelectEnabled={boxSelectEnabled}
+          cameraRef={cameraRef}
+        />
       </Canvas>
+
+      {boxSelectEnabled && (
+        <div
+          className={styles.boxSelectionLayer}
+          onPointerDown={beginBoxSelection}
+          onPointerMove={moveBoxSelection}
+          onPointerUp={finishBoxSelection}
+          onPointerCancel={() => setSelectionBox(null)}
+        >
+          {selectionBox && <div className={styles.selectionMarquee} style={marqueeStyle} />}
+          <div className={styles.boxSelectionHint}>Drag to select · Shift adds</div>
+        </div>
+      )}
     </>
   );
 }
