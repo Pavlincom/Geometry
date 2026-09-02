@@ -1,7 +1,66 @@
+.transformToolbar {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  z-index: 5;
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  background: rgba(13, 14, 17, 0.82);
+  backdrop-filter: blur(12px);
+}
+
+.transformToolbar button {
+  min-height: 31px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #aeb1b8;
+  padding: 0 9px;
+  font-size: 10px;
+}
+
+.transformToolbar button span {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 5px;
+  color: #777b84;
+  font-size: 8px;
+  font-weight: 800;
+}
+
+.transformToolbar button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.transformToolbar .activeTransform {
+  background: #f1eee6;
+  color: #111216;
+}
+
+.transformToolbar .activeTransform span {
+  border-color: rgba(17, 18, 22, 0.18);
+  color: #dc5a39;
+}
+
+.transformToolbar button:disabled {
+  opacity: 0.32;
+  cursor: default;
+}
+
 .viewToolbar {
   position: absolute;
   top: 16px;
-  left: 112px;
+  left: 224px;
   z-index: 4;
   display: flex;
   gap: 4px;
@@ -145,14 +204,22 @@
 }
 
 @media (max-width: 900px) {
+  .transformToolbar {
+    left: 12px;
+    max-width: calc(100% - 24px);
+    overflow-x: auto;
+  }
+
   .viewToolbar {
-    left: 82px;
-    max-width: calc(100% - 100px);
+    top: 60px;
+    left: 12px;
+    max-width: calc(100% - 24px);
     overflow-x: auto;
   }
 
   .formsPopover {
     left: 12px;
+    top: 104px;
     width: min(246px, calc(100% - 24px));
   }
 }
