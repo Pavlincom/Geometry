@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { CameraPreset, CameraRequest, GeometryCanvas } from "./geometry-canvas";
+import { MeasurementPanel } from "./measurement-panel";
 import styles from "./editor-controls.module.css";
 import { GeometryEdge, GeometryPoint, PrimitiveKind, useEditorStore } from "@/lib/editor-store";
 import { createClient } from "@/lib/supabase/client";
@@ -56,6 +57,11 @@ function isGeometryEdgeArray(value: unknown): value is GeometryEdge[] {
   });
 }
 
+function formatCoordinate(value: number) {
+  const rounded = Math.abs(value) < 0.0005 ? 0 : value;
+  return Number(rounded.toFixed(3)).toString();
+}
+
 export function EditorShell({ initialArtworkId = null }: EditorShellProps) {
   const points = useEditorStore((state) => state.points);
   const edges = useEditorStore((state) => state.edges);
@@ -97,6 +103,24 @@ export function EditorShell({ initialArtworkId = null }: EditorShellProps) {
     selectedIds.length === 1
       ? points.find((point) => point.id === selectedIds[0])
       : undefined;
+  const selectedPoints = selectedIds.flatMap((id) => {
+    const point = points.find((candidate) => candidate.id === id);
+    return point ? [point] : [];
+  });
+  const selectionCenter: [number, number, number] | null = selectedPoints.length > 0
+    ? (() => {
+        let x = 0;
+        let y = 0;
+        let z = 0;
+        selectedPoints.forEach((point) => {
+          x += point.position[0];
+          y += point.position[1];
+          z += point.position[2];
+        });
+        return [x / selectedPoints.length, y / selectedPoints.length, z / selectedPoints.length];
+      })()
+    : null;
+  const selectionType = selectedIds.length === 0 ? "None" : selectedIds.length === 1 ? "Point" : "Group";
 
   function requestCamera(preset: CameraPreset) {
     setCameraRequest((current) => ({ preset, version: current.version + 1 }));
@@ -405,7 +429,7 @@ export function EditorShell({ initialArtworkId = null }: EditorShellProps) {
           )}
 
           <div className="canvas-hint">
-            <strong>Shift-click</strong> points for a group · drag the shared XYZ gizmo to move it · <strong>Ctrl/Cmd + D</strong> duplicates
+            <strong>B</strong> box-select · <strong>W / E / R</strong> move, rotate, scale · <strong>Ctrl/Cmd + D</strong> duplicate
           </div>
           <div className="dimension-badge">3D / XYZ</div>
           {loadStatus === "loading" && <div className="editor-notice">Loading saved artwork…</div>}
@@ -413,40 +437,40 @@ export function EditorShell({ initialArtworkId = null }: EditorShellProps) {
           {saveStatus === "error" && <div className="editor-notice error">{saveError}</div>}
         </div>
 
-        <aside className="inspector">
-          <div className="inspector-section">
-            <p className="eyebrow">Structure</p>
-            <div className="stats-row"><span>Points</span><strong>{points.length}</strong></div>
-            <div className="stats-row"><span>Connections</span><strong>{edges.length}</strong></div>
-            <div className="stats-row"><span>Selected</span><strong>{selectedIds.length}</strong></div>
-            <div className="stats-row"><span>Snap</span><strong>{snapToGrid ? "0.5 on" : "Off"}</strong></div>
-            {artworkId && <div className="stats-row"><span>Cloud</span><strong>Saved</strong></div>}
-          </div>
-
-          <div className="inspector-section">
-            <p className="eyebrow">Views</p>
-            <p className="muted">Jump to an architectural view or fit the whole structure into frame.</p>
-            <div className={styles.inspectorButtonGrid}>
-              {CAMERA_VIEWS.map((view) => (
-                <button key={view.preset} type="button" onClick={() => requestCamera(view.preset)}>
-                  {view.label}
-                </button>
-              ))}
+        <aside className="inspector" aria-label="Studio inspector">
+          <section className={`inspector-section ${styles.inspectorObject}`}>
+            <div className={styles.sectionHeading}>
+              <div>
+                <p className="eyebrow">Object</p>
+                <strong>{title.trim() || "Untitled structure"}</strong>
+              </div>
+              <span className={styles.statusPill}>{artworkId ? "Cloud" : "Draft"}</span>
             </div>
-          </div>
+            <div className={styles.objectStats}>
+              <div><span>Points</span><strong>{points.length}</strong></div>
+              <div><span>Edges</span><strong>{edges.length}</strong></div>
+              <div><span>Snap</span><strong>{snapToGrid ? "0.5" : "Off"}</strong></div>
+            </div>
+          </section>
 
-          <div className="inspector-section">
-            <p className="eyebrow">Selection</p>
+          <section className="inspector-section">
+            <div className={styles.sectionHeading}>
+              <div>
+                <p className="eyebrow">Selection</p>
+                <strong>{selectionType}</strong>
+              </div>
+              <span className={styles.selectionCount}>{selectedIds.length}</span>
+            </div>
 
             {selectedIds.length === 0 && (
-              <p className="muted">
-                Click a point to select it. Shift-click additional points to build a group. Ctrl/Cmd + A selects everything.
-              </p>
+              <p className="muted">Click a point, Shift-click a group, or press B and drag a selection box.</p>
             )}
 
-            {selectedIds.length > 1 && (
+            {selectedIds.length > 0 && (
               <p className="muted">
-                {selectedIds.length} points selected. The XYZ gizmo now moves the whole group while preserving its shape.
+                {selectedIds.length === 1
+                  ? "One editable point selected."
+                  : `${selectedIds.length} points are acting as one transform group.`}
               </p>
             )}
 
@@ -456,9 +480,28 @@ export function EditorShell({ initialArtworkId = null }: EditorShellProps) {
               </button>
             )}
 
+            <div className={styles.selectionActions}>
+              <button type="button" disabled={!hasSelection} onClick={duplicateSelected} title="Duplicate (Ctrl/Cmd + D)">Duplicate</button>
+              <button type="button" disabled={!hasSelection} onClick={copySelected} title="Copy (Ctrl/Cmd + C)">Copy</button>
+              <button type="button" disabled={!hasClipboard} onClick={pasteClipboard} title="Paste (Ctrl/Cmd + V)">Paste</button>
+              <button type="button" disabled={!hasSelection} onClick={clearSelection} title="Clear selection (Esc)">Clear</button>
+            </div>
+          </section>
+
+          <section className="inspector-section">
+            <div className={styles.sectionHeading}>
+              <div>
+                <p className="eyebrow">Transform</p>
+                <strong>{selectedPoint ? "Point position" : selectionCenter ? "Group center" : "No selection"}</strong>
+              </div>
+              {hasSelection && <span className={styles.keySequence}>W · E · R</span>}
+            </div>
+
+            {!hasSelection && <p className="muted">Select geometry to expose position and transform controls.</p>}
+
             {selectedPoint && (
               <>
-                <p className="muted">Use the XYZ gizmo for direct movement, or type exact coordinates below.</p>
+                <p className="muted">Move with the gizmo or type exact XYZ coordinates.</p>
                 <div className="coordinate-panel">
                   {AXES.map(({ label, axis }) => (
                     <label key={label}>
@@ -475,53 +518,45 @@ export function EditorShell({ initialArtworkId = null }: EditorShellProps) {
               </>
             )}
 
-            <div className={styles.selectionActions}>
-              <button
-                type="button"
-                disabled={!hasSelection}
-                onClick={duplicateSelected}
-                title="Duplicate (Ctrl/Cmd + D)"
-              >
-                Duplicate
-              </button>
-              <button
-                type="button"
-                disabled={!hasSelection}
-                onClick={copySelected}
-                title="Copy (Ctrl/Cmd + C)"
-              >
-                Copy
-              </button>
-              <button
-                type="button"
-                disabled={!hasClipboard}
-                onClick={pasteClipboard}
-                title="Paste (Ctrl/Cmd + V)"
-              >
-                Paste
-              </button>
-              <button
-                type="button"
-                disabled={!hasSelection}
-                onClick={clearSelection}
-                title="Clear selection (Esc)"
-              >
-                Clear
-              </button>
-            </div>
+            {!selectedPoint && selectionCenter && (
+              <>
+                <p className="muted">Transforms use this shared center. W moves, E rotates and R scales the group.</p>
+                <div className={styles.centerGrid}>
+                  {AXES.map(({ label, axis }) => (
+                    <div key={label}>
+                      <span>{label}</span>
+                      <strong>{formatCoordinate(selectionCenter[axis])}</strong>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </section>
 
-            <p className={styles.shortcutHint}>
-              Shift-click multi-select · Esc clear · Delete remove · Ctrl/Cmd C/V/D copy, paste, duplicate
-            </p>
-          </div>
+          <section className="inspector-section">
+            <p className="eyebrow">Measurements</p>
+            <MeasurementPanel variant="embedded" />
+          </section>
+
+          <section className="inspector-section">
+            <div className={styles.sectionHeading}>
+              <div>
+                <p className="eyebrow">View</p>
+                <strong>Camera</strong>
+              </div>
+            </div>
+            <div className={styles.inspectorButtonGrid}>
+              {CAMERA_VIEWS.map((view) => (
+                <button key={view.preset} type="button" onClick={() => requestCamera(view.preset)}>
+                  {view.label}
+                </button>
+              ))}
+            </div>
+            <p className={styles.shortcutHint}>B box select · W/E/R transform · Esc clear · Delete remove</p>
+          </section>
 
           <div className="inspector-section inspector-bottom">
-            <button
-              className="danger-action"
-              type="button"
-              disabled={!hasSelection}
-              onClick={deleteSelected}
-            >
+            <button className="danger-action" type="button" disabled={!hasSelection} onClick={deleteSelected}>
               Delete selection
             </button>
           </div>
