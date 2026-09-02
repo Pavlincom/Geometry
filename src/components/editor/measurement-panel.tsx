@@ -38,7 +38,11 @@ function angleAt(a: Vec3Tuple, b: Vec3Tuple, c: Vec3Tuple) {
   return (Math.acos(cosine) * 180) / Math.PI;
 }
 
-export function MeasurementPanel() {
+type MeasurementPanelProps = {
+  variant?: "floating" | "embedded";
+};
+
+export function MeasurementPanel({ variant = "floating" }: MeasurementPanelProps) {
   const points = useEditorStore((state) => state.points);
   const selectedIds = useEditorStore((state) => state.selectedIds);
 
@@ -74,12 +78,16 @@ export function MeasurementPanel() {
     return null;
   }, [selectedPoints]);
 
+  const className = `${styles.panel} ${variant === "embedded" ? styles.embedded : styles.floating}`;
+
   return (
-    <aside className={styles.panel} aria-live="polite" aria-label="Geometry measurements">
-      <div className={styles.heading}>
-        <span>Measure</span>
-        <strong>{selectedPoints.length} selected</strong>
-      </div>
+    <aside className={className} aria-live="polite" aria-label="Geometry measurements">
+      {variant === "floating" && (
+        <div className={styles.heading}>
+          <span>Measure</span>
+          <strong>{selectedPoints.length} selected</strong>
+        </div>
+      )}
 
       {!measurement && (
         <p className={styles.empty}>
