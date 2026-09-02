@@ -5,12 +5,19 @@ import { Canvas, ThreeEvent, useThree } from "@react-three/fiber";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Color, Group, Plane, Vector3 } from "three";
 import { useEditorStore, Vec3Tuple } from "@/lib/editor-store";
+import styles from "./editor-controls.module.css";
 
 const GRID_STEP = 0.5;
 
 export type CameraPreset = "fit" | "iso" | "top" | "front" | "right";
 export type CameraRequest = { preset: CameraPreset; version: number };
 export type TransformMode = "translate" | "rotate" | "scale";
+
+const TRANSFORM_MODES: Array<{ mode: TransformMode; label: string; key: string }> = [
+  { mode: "translate", label: "Move", key: "W" },
+  { mode: "rotate", label: "Rotate", key: "E" },
+  { mode: "scale", label: "Scale", key: "R" },
+];
 
 function snapCoordinate(value: number, enabled: boolean) {
   if (enabled) return Math.round(value / GRID_STEP) * GRID_STEP;
@@ -293,7 +300,11 @@ function Scene({
             position={point.position}
             scale={selected ? 1.35 : 1}
             onPointerDown={(event) => {
-              if (event.button !== 0 || isGizmoDragging || transformMode !== "translate") return;
+              if (event.button !== 0 || isGizmoDragging) return;
+              if (transformMode !== "translate") {
+                event.stopPropagation();
+                return;
+              }
               event.stopPropagation();
 
               const movingIds = selected && selectedIds.length > 1 ? [...selectedIds] : [point.id];
@@ -432,20 +443,63 @@ function Scene({
   );
 }
 
-export function GeometryCanvas({
-  cameraRequest,
-  transformMode,
-}: {
-  cameraRequest: CameraRequest;
-  transformMode: TransformMode;
-}) {
+export function GeometryCanvas({ cameraRequest }: { cameraRequest: CameraRequest }) {
+  const selectedCount = useEditorStore((state) => state.selectedIds.length);
+  const [transformMode, setTransformMode] = useState<TransformMode>("translate");
+
+  useEffect(() => {
+    if (selectedCount < 2 && transformMode !== "translate") {
+      setTransformMode("translate");
+    }
+  }, [selectedCount, transformMode]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      const isTyping =
+        target?.tagName === "INPUT" ||
+        target?.tagName === "TEXTAREA" ||
+        target?.isContentEditable;
+      if (isTyping || event.metaKey || event.ctrlKey || event.altKey) return;
+
+      const key = event.key.toLowerCase();
+      if (key === "w") setTransformMode("translate");
+      if (key === "e" && selectedCount > 1) setTransformMode("rotate");
+      if (key === "r" && selectedCount > 1) setTransformMode("scale");
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [selectedCount]);
+
   return (
-    <Canvas
-      camera={{ position: [6.5, 5.2, 7.2], fov: 45 }}
-      dpr={[1, 2]}
-      gl={{ antialias: true }}
-    >
-      <Scene cameraRequest={cameraRequest} transformMode={transformMode} />
-    </Canvas>
+    <>
+      <div className={styles.transformToolbar} aria-label="Transform mode">
+        {TRANSFORM_MODES.map((item) => {
+          const groupOnly = item.mode !== "translate";
+          const disabled = groupOnly && selectedCount < 2;
+          return (
+            <button
+              key={item.mode}
+              type="button"
+              className={transformMode === item.mode ? styles.activeTransform : ""}
+              disabled={disabled}
+              onClick={() => setTransformMode(item.mode)}
+              title={`${item.label} (${item.key})${groupOnly ? " · select 2+ points" : ""}`}
+            >
+              <span>{item.key}</span>{item.label}
+            </button>
+          );
+        })}
+      </div>
+
+      <Canvas
+        camera={{ position: [6.5, 5.2, 7.2], fov: 45 }}
+        dpr={[1, 2]}
+        gl={{ antialias: true }}
+      >
+        <Scene cameraRequest={cameraRequest} transformMode={transformMode} />
+      </Canvas>
+    </>
   );
 }
