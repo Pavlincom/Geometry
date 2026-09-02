@@ -10,6 +10,7 @@ const GRID_STEP = 0.5;
 
 export type CameraPreset = "fit" | "iso" | "top" | "front" | "right";
 export type CameraRequest = { preset: CameraPreset; version: number };
+export type TransformMode = "translate" | "rotate" | "scale";
 
 function snapCoordinate(value: number, enabled: boolean) {
   if (enabled) return Math.round(value / GRID_STEP) * GRID_STEP;
@@ -84,7 +85,13 @@ function CameraDirector({ request }: { request: CameraRequest }) {
   return null;
 }
 
-function Scene({ cameraRequest }: { cameraRequest: CameraRequest }) {
+function Scene({
+  cameraRequest,
+  transformMode,
+}: {
+  cameraRequest: CameraRequest;
+  transformMode: TransformMode;
+}) {
   const points = useEditorStore((state) => state.points);
   const edges = useEditorStore((state) => state.edges);
   const selectedIds = useEditorStore((state) => state.selectedIds);
@@ -167,6 +174,68 @@ function Scene({ cameraRequest }: { cameraRequest: CameraRequest }) {
     target.releasePointerCapture?.(event.pointerId);
   };
 
+  const transformSelection = () => {
+    const target = gizmoTarget.current;
+    if (!target) return;
+
+    if (transformMode === "translate") {
+      const dx = target.position.x - gizmoStartCenter.current.x;
+      const dy = target.position.y - gizmoStartCenter.current.y;
+      const dz = target.position.z - gizmoStartCenter.current.z;
+
+      movePoints(
+        Array.from(gizmoStartPositions.current.entries()).map(([id, start]) => ({
+          id,
+          position: [start[0] + dx, start[1] + dy, start[2] + dz] as Vec3Tuple,
+        }))
+      );
+      return;
+    }
+
+    const center = gizmoStartCenter.current;
+
+    if (transformMode === "rotate") {
+      movePoints(
+        Array.from(gizmoStartPositions.current.entries()).map(([id, start]) => {
+          const relative = new Vector3(
+            start[0] - center.x,
+            start[1] - center.y,
+            start[2] - center.z
+          ).applyQuaternion(target.quaternion);
+
+          return {
+            id,
+            position: [
+              center.x + relative.x,
+              center.y + relative.y,
+              center.z + relative.z,
+            ] as Vec3Tuple,
+          };
+        })
+      );
+      return;
+    }
+
+    movePoints(
+      Array.from(gizmoStartPositions.current.entries()).map(([id, start]) => {
+        const relative = new Vector3(
+          start[0] - center.x,
+          start[1] - center.y,
+          start[2] - center.z
+        ).multiply(target.scale);
+
+        return {
+          id,
+          position: [
+            center.x + relative.x,
+            center.y + relative.y,
+            center.z + relative.z,
+          ] as Vec3Tuple,
+        };
+      })
+    );
+  };
+
   return (
     <>
       <color attach="background" args={[new Color("#0a0b0d")]} />
@@ -224,17 +293,12 @@ function Scene({ cameraRequest }: { cameraRequest: CameraRequest }) {
             position={point.position}
             scale={selected ? 1.35 : 1}
             onPointerDown={(event) => {
-              if (event.button !== 0 || isGizmoDragging) return;
+              if (event.button !== 0 || isGizmoDragging || transformMode !== "translate") return;
               event.stopPropagation();
 
-              const movingIds =
-                selected && selectedIds.length > 1
-                  ? [...selectedIds]
-                  : [point.id];
+              const movingIds = selected && selectedIds.length > 1 ? [...selectedIds] : [point.id];
 
-              if (!selected) {
-                selectPoint(point.id);
-              }
+              if (!selected) selectPoint(point.id);
 
               dragPlane.setFromNormalAndCoplanarPoint(
                 new Vector3(0, 1, 0),
@@ -250,9 +314,7 @@ function Scene({ cameraRequest }: { cameraRequest: CameraRequest }) {
               dragStartPositions.current = new Map(
                 movingIds.flatMap((id) => {
                   const position = pointMap.get(id);
-                  return position
-                    ? [[id, [...position] as Vec3Tuple] as const]
-                    : [];
+                  return position ? [[id, [...position] as Vec3Tuple] as const] : [];
                 })
               );
               dragMoved.current = false;
@@ -280,9 +342,7 @@ function Scene({ cameraRequest }: { cameraRequest: CameraRequest }) {
               const dx = targetX - anchor[0];
               const dz = targetZ - anchor[2];
 
-              if (Math.abs(dx) > 0.0001 || Math.abs(dz) > 0.0001) {
-                dragMoved.current = true;
-              }
+              if (Math.abs(dx) > 0.0001 || Math.abs(dz) > 0.0001) dragMoved.current = true;
 
               movePoints(
                 dragIds.current.flatMap((id) => {
@@ -291,11 +351,7 @@ function Scene({ cameraRequest }: { cameraRequest: CameraRequest }) {
 
                   return [{
                     id,
-                    position: [
-                      start[0] + dx,
-                      start[1],
-                      start[2] + dz,
-                    ] as Vec3Tuple,
+                    position: [start[0] + dx, start[1], start[2] + dz] as Vec3Tuple,
                   }];
                 })
               );
@@ -325,46 +381,35 @@ function Scene({ cameraRequest }: { cameraRequest: CameraRequest }) {
 
       {selectionCenter && (
         <TransformControls
-          mode="translate"
+          mode={transformMode}
           space="world"
           size={0.78}
           translationSnap={snapToGrid ? GRID_STEP : null}
           onMouseDown={() => {
-            beginGesture();
-            setIsGizmoDragging(true);
-
-            gizmoStartCenter.current.set(
-              selectionCenter[0],
-              selectionCenter[1],
-              selectionCenter[2]
-            );
-            gizmoStartPositions.current = new Map(
-              selectedPoints.map((point) => [
-                point.id,
-                [...point.position] as Vec3Tuple,
-              ])
-            );
-          }}
-          onObjectChange={() => {
             const target = gizmoTarget.current;
             if (!target) return;
 
-            const dx = target.position.x - gizmoStartCenter.current.x;
-            const dy = target.position.y - gizmoStartCenter.current.y;
-            const dz = target.position.z - gizmoStartCenter.current.z;
+            beginGesture();
+            setIsGizmoDragging(true);
 
-            movePoints(
-              Array.from(gizmoStartPositions.current.entries()).map(([id, start]) => ({
-                id,
-                position: [
-                  start[0] + dx,
-                  start[1] + dy,
-                  start[2] + dz,
-                ] as Vec3Tuple,
-              }))
+            gizmoStartCenter.current.set(selectionCenter[0], selectionCenter[1], selectionCenter[2]);
+            gizmoStartPositions.current = new Map(
+              selectedPoints.map((point) => [point.id, [...point.position] as Vec3Tuple])
             );
+
+            target.position.set(selectionCenter[0], selectionCenter[1], selectionCenter[2]);
+            target.rotation.set(0, 0, 0);
+            target.scale.set(1, 1, 1);
+            target.updateMatrixWorld();
           }}
+          onObjectChange={transformSelection}
           onMouseUp={() => {
+            const target = gizmoTarget.current;
+            if (target) {
+              target.rotation.set(0, 0, 0);
+              target.scale.set(1, 1, 1);
+            }
+
             setIsGizmoDragging(false);
             gizmoStartPositions.current = new Map();
             endGesture();
@@ -387,14 +432,20 @@ function Scene({ cameraRequest }: { cameraRequest: CameraRequest }) {
   );
 }
 
-export function GeometryCanvas({ cameraRequest }: { cameraRequest: CameraRequest }) {
+export function GeometryCanvas({
+  cameraRequest,
+  transformMode,
+}: {
+  cameraRequest: CameraRequest;
+  transformMode: TransformMode;
+}) {
   return (
     <Canvas
       camera={{ position: [6.5, 5.2, 7.2], fov: 45 }}
       dpr={[1, 2]}
       gl={{ antialias: true }}
     >
-      <Scene cameraRequest={cameraRequest} />
+      <Scene cameraRequest={cameraRequest} transformMode={transformMode} />
     </Canvas>
   );
 }
